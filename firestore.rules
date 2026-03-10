@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // All authenticated users can read/write inventory items
+    match /inventory_items/{itemId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null
+        && (resource.data.addedBy == request.auth.uid || true);
+        // ^ Remove "|| true" to restrict edits/deletes to item owner only
+    }
+
+    // User stats - only owner can read/write their own stats
+    match /user_stats/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
