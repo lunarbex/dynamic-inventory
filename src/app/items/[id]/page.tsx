@@ -65,6 +65,7 @@ export default function ItemDetailPage() {
   }
 
   async function handleCategoriesSave(cats: ActivityZoneId[]) {
+    if (!item) return;
     setSavingCategories(true);
     try {
       await updateItem(item.id, { categories: cats }, { uid: user!.uid, email: user!.email ?? "" });
@@ -79,6 +80,7 @@ export default function ItemDetailPage() {
   }
 
   async function handleTagsSave(tags: string[]) {
+    if (!item) return;
     setSavingTags(true);
     try {
       await updateItem(item.id, { tags }, { uid: user!.uid, email: user!.email ?? "" });
