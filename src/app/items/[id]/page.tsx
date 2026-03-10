@@ -65,11 +65,12 @@ export default function ItemDetailPage() {
   }
 
   async function handleCategoriesSave(cats: ActivityZoneId[]) {
-    if (!item) return;
+    const currentItem = item;
+    if (!currentItem) return;
     setSavingCategories(true);
     try {
-      await updateItem(item.id, { categories: cats }, { uid: user!.uid, email: user!.email ?? "" });
-      setItem({ ...item, categories: cats });
+      await updateItem(currentItem.id, { categories: cats }, { uid: user!.uid, email: user!.email ?? "" });
+      setItem({ ...currentItem, categories: cats });
       setEditingCategories(false);
       toast.success("Categories saved");
     } catch {
@@ -80,11 +81,12 @@ export default function ItemDetailPage() {
   }
 
   async function handleTagsSave(tags: string[]) {
-    if (!item) return;
+    const currentItem = item;
+    if (!currentItem) return;
     setSavingTags(true);
     try {
-      await updateItem(item.id, { tags }, { uid: user!.uid, email: user!.email ?? "" });
-      setItem({ ...item, tags });
+      await updateItem(currentItem.id, { tags }, { uid: user!.uid, email: user!.email ?? "" });
+      setItem({ ...currentItem, tags });
       setEditingTags(false);
       toast.success("Tags saved");
     } catch {
