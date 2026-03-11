@@ -1,5 +1,27 @@
 export type ConfirmationMode = "auto" | "ask" | "manual";
 
+export type MemberRole = "admin" | "contributor" | "viewer";
+
+export interface InventoryMember {
+  userId: string;
+  email: string;
+  displayName?: string;
+  role: MemberRole;
+  joinedAt: Date;
+}
+
+export interface InventoryBook {
+  id: string;
+  name: string;
+  createdBy: string;
+  createdAt: Date;
+  memberIds: string[];                        // for array-contains queries
+  members: Record<string, InventoryMember>;   // keyed by userId
+  settings?: {
+    agentEnabled?: boolean;
+  };
+}
+
 export const ACTIVITY_ZONES = [
   { id: "edible", label: "Edible Nourishment", icon: "🥗" },
   { id: "kitchen", label: "Kitchen", icon: "🍳" },
@@ -29,6 +51,7 @@ export interface OriginPlace {
 
 export interface InventoryItem {
   id: string;
+  inventoryId: string;
   name: string;
   description: string;
   story: string;

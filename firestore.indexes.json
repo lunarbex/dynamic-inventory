@@ -4,6 +4,14 @@
       "collectionGroup": "inventory_items",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "inventoryId", "order": "ASCENDING" },
+        { "fieldPath": "addedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "inventory_items",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "categories", "arrayConfig": "CONTAINS" },
         { "fieldPath": "addedAt", "order": "DESCENDING" }
       ]

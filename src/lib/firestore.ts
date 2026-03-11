@@ -29,6 +29,7 @@ function timestampToDate(ts: Timestamp | Date | undefined): Date {
 export function itemFromFirestore(id: string, data: Record<string, unknown>): InventoryItem {
   return {
     id,
+    inventoryId: (data.inventoryId as string) ?? "",
     name: (data.name as string) ?? "",
     description: (data.description as string) ?? "",
     story: (data.story as string) ?? "",
@@ -56,7 +57,7 @@ export function itemFromFirestore(id: string, data: Record<string, unknown>): In
 }
 
 export async function addItem(
-  item: Omit<InventoryItem, "id" | "addedAt" | "updatedAt">
+  item: Omit<InventoryItem, "id" | "addedAt" | "updatedAt"> & { inventoryId: string }
 ): Promise<string> {
   console.log("[Firestore] addItem — writing to collection:", ITEMS_COLLECTION);
   console.log("[Firestore] addItem — payload:", {
@@ -114,10 +115,15 @@ export async function getAllItems(): Promise<InventoryItem[]> {
 }
 
 export function subscribeToItems(
+  inventoryId: string,
   callback: (items: InventoryItem[]) => void
 ): () => void {
-  console.log("[Firestore] subscribeToItems — attaching listener");
-  const q = query(collection(db, ITEMS_COLLECTION), orderBy("addedAt", "desc"));
+  console.log("[Firestore] subscribeToItems — inventoryId:", inventoryId);
+  const q = query(
+    collection(db, ITEMS_COLLECTION),
+    where("inventoryId", "==", inventoryId),
+    orderBy("addedAt", "desc")
+  );
   return onSnapshot(
     q,
     (snap) => {

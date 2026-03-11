@@ -1,5 +1,9 @@
 "use client";
 
+// Prevent Next.js from attempting static generation or server-side pre-rendering
+// for this route. Firebase Auth is client-only; SSR attempts cause 503s.
+export const dynamic = "force-dynamic";
+
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
@@ -27,6 +31,7 @@ export default function ItemDetailPage() {
   const [loading, setLoading] = useState(true);
   const [photoIndex, setPhotoIndex] = useState(0);
   const [deleting, setDeleting] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editingCategories, setEditingCategories] = useState(false);
   const [savingCategories, setSavingCategories] = useState(false);
@@ -39,18 +44,58 @@ export default function ItemDetailPage() {
 
   useEffect(() => {
     if (!id) return;
-    getItem(id).then(setItem).finally(() => setLoading(false));
+    let cancelled = false;
+
+    const timeout = setTimeout(() => {
+      if (!cancelled) {
+        setLoading(false);
+        setFetchError(true);
+      }
+    }, 10_000);
+
+    getItem(id)
+      .then((data) => { if (!cancelled) setItem(data); })
+      .catch(() => { if (!cancelled) setFetchError(true); })
+      .finally(() => { if (!cancelled) { clearTimeout(timeout); setLoading(false); } });
+
+    return () => { cancelled = true; clearTimeout(timeout); };
   }, [id]);
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen">
+        <Header />
+        <main className="max-w-2xl mx-auto px-4 py-6">
+          <div className="h-4 w-32 bg-stone-100 rounded animate-pulse mb-6" />
+          <div className="aspect-[4/3] bg-stone-100 rounded-2xl animate-pulse mb-6" />
+          <div className="h-7 w-2/3 bg-stone-100 rounded animate-pulse mb-3" />
+          <div className="h-4 w-full bg-stone-100 rounded animate-pulse mb-2" />
+          <div className="h-4 w-4/5 bg-stone-100 rounded animate-pulse" />
+        </main>
       </div>
     );
   }
 
-  if (!user) return <LoginForm />;
+  if (!authLoading && !user) return <LoginForm />;
+
+  if (fetchError) {
+    return (
+      <div className="min-h-screen">
+        <Header />
+        <div className="text-center py-20">
+          <p className="text-stone-500 font-medium">Failed to load item</p>
+          <p className="text-stone-400 text-sm mt-1">Check your connection and try again</p>
+          <button
+            onClick={() => { setFetchError(false); setLoading(true); getItem(id).then(setItem).catch(() => setFetchError(true)).finally(() => setLoading(false)); }}
+            className="mt-4 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold rounded-xl transition-colors"
+          >
+            Retry
+          </button>
+          <Link href="/" className="text-amber-600 mt-3 block hover:underline text-sm">Back to inventory</Link>
+        </div>
+      </div>
+    );
+  }
 
   if (!item) {
     return (
@@ -134,8 +179,8 @@ export default function ItemDetailPage() {
           <h2 className="text-lg font-semibold text-stone-800 mb-6">Edit — {item.name}</h2>
           <EditItemForm
             item={item}
-            userId={user.uid}
-            userEmail={user.email ?? ""}
+            userId={user?.uid ?? ""}
+            userEmail={user?.email ?? ""}
             onSave={(updated) => { setItem(updated); setEditing(false); }}
             onCancel={() => setEditing(false)}
           />

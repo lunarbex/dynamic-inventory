@@ -13,8 +13,10 @@ import {
 import { auth } from "@/lib/firebase";
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  // auth.currentUser is populated synchronously from SDK cache for returning users.
+  // This avoids the loading flash entirely on repeat visits.
+  const [user, setUser] = useState<User | null>(auth.currentUser);
+  const [loading, setLoading] = useState(auth.currentUser === null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {

@@ -4,17 +4,23 @@ import { useState, useEffect } from "react";
 import { subscribeToItems } from "@/lib/firestore";
 import type { InventoryItem, ActivityZoneId } from "@/lib/types";
 
-export function useInventory() {
+export function useInventory(inventoryId: string | null) {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = subscribeToItems((data) => {
+    if (!inventoryId) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const unsubscribe = subscribeToItems(inventoryId, (data) => {
       setItems(data);
       setLoading(false);
     });
     return unsubscribe;
-  }, []);
+  }, [inventoryId]);
 
   function filterByCategory(category: ActivityZoneId) {
     return items.filter((item) => item.categories.includes(category));

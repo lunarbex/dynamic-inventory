@@ -8,6 +8,7 @@ import { CategoryPicker } from "./CategoryPicker";
 import { PhotoCapture } from "./PhotoCapture";
 import { TagInput } from "./TagInput";
 import { useAuthContext } from "@/components/auth/AuthProvider";
+import { useInventoryContext } from "@/context/InventoryContext";
 import { addItem } from "@/lib/firestore";
 import { uploadPhotos } from "@/lib/storage";
 import type { ActivityZoneId, ConfirmationMode, OriginPlace } from "@/lib/types";
@@ -53,6 +54,7 @@ function emptyExtracted(): ExtractedState {
 
 export function AddItemFlow() {
   const { user } = useAuthContext();
+  const { currentInventory } = useInventoryContext();
   const router = useRouter();
 
   const [step, setStep] = useState<Step>("capture");
@@ -129,7 +131,7 @@ export function AddItemFlow() {
   // ── Save ─────────────────────────────────────────────────────────────────
 
   async function save(confirmationMode: ConfirmationMode) {
-    if (!user || !extracted) return;
+    if (!user || !extracted || !currentInventory) return;
     setStep("saving");
 
     console.log("[AddItemFlow] save() — user:", user.uid);
@@ -147,6 +149,7 @@ export function AddItemFlow() {
       console.log("[AddItemFlow] writing to Firestore...");
 
       const newId = await addItem({
+        inventoryId: currentInventory.id,
         name: extracted.name || "Unnamed item",
         description: extracted.description,
         story: extracted.story,

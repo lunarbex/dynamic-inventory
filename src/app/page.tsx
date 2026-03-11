@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useAuthContext } from "@/components/auth/AuthProvider";
+import { useInventoryContext } from "@/context/InventoryContext";
 import { LoginForm } from "@/components/auth/LoginForm";
+import { InventorySelector } from "@/components/inventory/InventorySelector";
 import { Header } from "@/components/layout/Header";
 import { ItemCard } from "@/components/inventory/ItemCard";
 import { useInventory } from "@/hooks/useInventory";
@@ -12,18 +14,12 @@ import { Plus } from "lucide-react";
 
 export default function HomePage() {
   const { user, loading: authLoading } = useAuthContext();
-  const { items, loading: itemsLoading } = useInventory();
+  const { currentInventory, loadingInventories } = useInventoryContext();
+  const { items, loading: itemsLoading } = useInventory(currentInventory?.id ?? null);
   const [activeZone, setActiveZone] = useState<ActivityZoneId | "all">("all");
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!user) return <LoginForm />;
+  if (!authLoading && !user) return <LoginForm />;
+  if (!loadingInventories && !currentInventory) return <InventorySelector />;
 
   const displayItems =
     activeZone === "all" ? items : items.filter((i) => i.categories.includes(activeZone));
@@ -75,7 +71,7 @@ export default function HomePage() {
         {/* Stats bar */}
         <div className="flex items-center justify-between my-4">
           <p className="text-sm text-stone-500">
-            {itemsLoading
+            {authLoading || itemsLoading
               ? "Loading..."
               : `${displayItems.length} ${displayItems.length === 1 ? "item" : "items"}`}
           </p>
@@ -89,7 +85,7 @@ export default function HomePage() {
         </div>
 
         {/* Items grid */}
-        {itemsLoading ? (
+        {authLoading || itemsLoading ? (
           <div className="grid grid-cols-2 gap-3">
             {[...Array(4)].map((_, i) => (
               <div

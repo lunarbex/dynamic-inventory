@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useAuthContext } from "@/components/auth/AuthProvider";
+import { useInventoryContext } from "@/context/InventoryContext";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { Header } from "@/components/layout/Header";
 import { useInventory } from "@/hooks/useInventory";
@@ -15,7 +16,8 @@ const MapView = dynamic(
 
 export default function MapPage() {
   const { user, loading } = useAuthContext();
-  const { items, loading: itemsLoading } = useInventory();
+  const { currentInventory } = useInventoryContext();
+  const { items, loading: itemsLoading } = useInventory(currentInventory?.id ?? null);
 
   if (loading) {
     return (

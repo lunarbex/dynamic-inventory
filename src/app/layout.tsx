@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
+import { InventoryProvider } from "@/context/InventoryContext";
 import { Toaster } from "react-hot-toast";
 
 const geist = Geist({
@@ -31,6 +32,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geist.variable} font-sans antialiased bg-stone-50 text-stone-900`}>
         <AuthProvider>
+          <InventoryProvider>
           {children}
           <Toaster
             position="top-center"
@@ -43,6 +45,7 @@ export default function RootLayout({
               },
             }}
           />
+          </InventoryProvider>
         </AuthProvider>
       </body>
     </html>

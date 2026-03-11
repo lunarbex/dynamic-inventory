@@ -2,6 +2,7 @@
 
 import { useState, useDeferredValue } from "react";
 import { useAuthContext } from "@/components/auth/AuthProvider";
+import { useInventoryContext } from "@/context/InventoryContext";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { Header } from "@/components/layout/Header";
 import { ItemCard } from "@/components/inventory/ItemCard";
@@ -10,7 +11,8 @@ import { Search, X } from "lucide-react";
 
 export default function SearchPage() {
   const { user, loading } = useAuthContext();
-  const { items, loading: itemsLoading } = useInventory();
+  const { currentInventory } = useInventoryContext();
+  const { items, loading: itemsLoading } = useInventory(currentInventory?.id ?? null);
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
 
