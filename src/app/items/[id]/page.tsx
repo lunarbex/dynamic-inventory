@@ -1,7 +1,5 @@
 "use client";
 
-// Prevent Next.js from attempting static generation or server-side pre-rendering
-// for this route. Firebase Auth is client-only; SSR attempts cause 503s.
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
@@ -18,10 +16,23 @@ import { CategoryPicker } from "@/components/inventory/CategoryPicker";
 import { TagInput } from "@/components/inventory/TagInput";
 import { EditItemForm } from "@/components/inventory/EditItemForm";
 import {
-  MapPin, User, Calendar, Trash2, ArrowLeft,
-  ChevronLeft, ChevronRight, Navigation, Heart, Pencil,
+  ArrowLeft, ChevronLeft, ChevronRight, MapPin,
+  Navigation, Heart, Pencil, Trash2,
 } from "lucide-react";
 import toast from "react-hot-toast";
+
+// Tag colors — same palette as ItemCard
+const TAG_PALETTE = [
+  { bg: "#f0e8d0", color: "#6b4010" },
+  { bg: "#deebd6", color: "#30561e" },
+  { bg: "#dde8e4", color: "#1e5040" },
+  { bg: "#ecdde4", color: "#661830" },
+  { bg: "#e2ddf0", color: "#342070" },
+];
+function tagStyle(tag: string) {
+  const idx = [...tag].reduce((acc, c) => acc + c.charCodeAt(0), 0) % TAG_PALETTE.length;
+  return TAG_PALETTE[idx];
+}
 
 export default function ItemDetailPage() {
   const { user, loading: authLoading } = useAuthContext();
@@ -45,32 +56,31 @@ export default function ItemDetailPage() {
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
-
     const timeout = setTimeout(() => {
-      if (!cancelled) {
-        setLoading(false);
-        setFetchError(true);
-      }
+      if (!cancelled) { setLoading(false); setFetchError(true); }
     }, 10_000);
-
     getItem(id)
       .then((data) => { if (!cancelled) setItem(data); })
       .catch(() => { if (!cancelled) setFetchError(true); })
       .finally(() => { if (!cancelled) { clearTimeout(timeout); setLoading(false); } });
-
     return () => { cancelled = true; clearTimeout(timeout); };
   }, [id]);
 
+  // ── Loading skeleton ─────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen">
+      <div className="min-h-screen" style={{ background: "var(--parchment)" }}>
         <Header />
-        <main className="max-w-2xl mx-auto px-4 py-6">
-          <div className="h-4 w-32 bg-stone-100 rounded animate-pulse mb-6" />
-          <div className="aspect-[4/3] bg-stone-100 rounded-2xl animate-pulse mb-6" />
-          <div className="h-7 w-2/3 bg-stone-100 rounded animate-pulse mb-3" />
-          <div className="h-4 w-full bg-stone-100 rounded animate-pulse mb-2" />
-          <div className="h-4 w-4/5 bg-stone-100 rounded animate-pulse" />
+        <main className="max-w-xl mx-auto px-6 py-8">
+          <div className="h-3 w-28 rounded animate-pulse mb-8" style={{ background: "var(--parchment-dark)" }} />
+          <div className="h-8 w-2/3 rounded animate-pulse mb-3" style={{ background: "var(--parchment-dark)" }} />
+          <div className="h-4 w-1/2 rounded animate-pulse mb-8" style={{ background: "var(--parchment-dark)" }} />
+          <div className="aspect-[4/3] rounded-sm animate-pulse mb-8" style={{ background: "var(--parchment-dark)" }} />
+          <div className="space-y-2">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-4 rounded animate-pulse" style={{ background: "var(--parchment-dark)", width: `${75 + (i % 3) * 10}%` }} />
+            ))}
+          </div>
         </main>
       </div>
     );
@@ -80,18 +90,24 @@ export default function ItemDetailPage() {
 
   if (fetchError) {
     return (
-      <div className="min-h-screen">
+      <div className="min-h-screen" style={{ background: "var(--parchment)" }}>
         <Header />
         <div className="text-center py-20">
-          <p className="text-stone-500 font-medium">Failed to load item</p>
-          <p className="text-stone-400 text-sm mt-1">Check your connection and try again</p>
+          <p className="font-serif text-lg mb-2" style={{ color: "var(--ink)" }}>Page not found</p>
+          <p className="text-sm mb-4" style={{ color: "var(--ink-light)" }}>Check your connection and try again</p>
           <button
-            onClick={() => { setFetchError(false); setLoading(true); getItem(id).then(setItem).catch(() => setFetchError(true)).finally(() => setLoading(false)); }}
-            className="mt-4 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold rounded-xl transition-colors"
+            onClick={() => {
+              setFetchError(false); setLoading(true);
+              getItem(id).then(setItem).catch(() => setFetchError(true)).finally(() => setLoading(false));
+            }}
+            className="px-4 py-2 text-sm font-semibold mr-3 transition-opacity hover:opacity-80"
+            style={{ background: "var(--gold)", color: "var(--parchment-light)" }}
           >
             Retry
           </button>
-          <Link href="/" className="text-amber-600 mt-3 block hover:underline text-sm">Back to inventory</Link>
+          <Link href="/" className="text-sm" style={{ color: "var(--gold)" }}>
+            ← Table of Contents
+          </Link>
         </div>
       </div>
     );
@@ -99,11 +115,13 @@ export default function ItemDetailPage() {
 
   if (!item) {
     return (
-      <div className="min-h-screen">
+      <div className="min-h-screen" style={{ background: "var(--parchment)" }}>
         <Header />
         <div className="text-center py-20">
-          <p className="text-stone-500">Item not found</p>
-          <Link href="/" className="text-amber-600 mt-2 block hover:underline">Back to inventory</Link>
+          <p className="font-serif" style={{ color: "var(--ink-light)" }}>Entry not found</p>
+          <Link href="/" className="text-sm mt-2 block" style={{ color: "var(--gold)" }}>
+            ← Table of Contents
+          </Link>
         </div>
       </div>
     );
@@ -117,9 +135,9 @@ export default function ItemDetailPage() {
       await updateItem(currentItem.id, { categories: cats }, { uid: user!.uid, email: user!.email ?? "" });
       setItem({ ...currentItem, categories: cats });
       setEditingCategories(false);
-      toast.success("Categories saved");
+      toast.success("Chapters updated");
     } catch {
-      toast.error("Failed to save categories");
+      toast.error("Failed to save chapters");
     } finally {
       setSavingCategories(false);
     }
@@ -142,19 +160,22 @@ export default function ItemDetailPage() {
   }
 
   async function handleDelete() {
-    if (!confirm("Delete this item? This cannot be undone.")) return;
+    if (!confirm("Delete this entry? This cannot be undone.")) return;
     setDeleting(true);
     try {
       await deleteItem(id);
-      toast.success("Item deleted");
+      toast.success("Entry deleted");
       router.push("/");
     } catch {
-      toast.error("Failed to delete item");
+      toast.error("Failed to delete entry");
       setDeleting(false);
     }
   }
 
-  const zones = item.categories.map((id) => ACTIVITY_ZONES.find((z) => z.id === id)).filter(Boolean);
+  const zones = item.categories
+    .map((zid) => ACTIVITY_ZONES.find((z) => z.id === zid))
+    .filter(Boolean);
+
   const formattedDate = item.addedAt
     ? new Intl.DateTimeFormat("en-US", { year: "numeric", month: "long", day: "numeric" }).format(item.addedAt)
     : "";
@@ -167,16 +188,22 @@ export default function ItemDetailPage() {
     ? `https://www.openstreetmap.org/?mlat=${item.originPlace.lat}&mlon=${item.originPlace.lng}#map=10/${item.originPlace.lat}/${item.originPlace.lng}`
     : null;
 
+  // ── Edit mode ────────────────────────────────────────────────────
   if (editing) {
     return (
-      <div className="min-h-screen">
+      <div className="min-h-screen" style={{ background: "var(--parchment)" }}>
         <Header />
-        <main className="max-w-2xl mx-auto px-4 py-6">
-          <button onClick={() => setEditing(false)}
-            className="inline-flex items-center gap-1.5 text-sm text-stone-500 hover:text-stone-800 mb-4 transition-colors">
-            <ArrowLeft className="w-4 h-4" />Back to item
+        <main className="max-w-xl mx-auto px-6 py-8">
+          <button
+            onClick={() => setEditing(false)}
+            className="inline-flex items-center gap-1.5 text-sm mb-6 transition-opacity hover:opacity-70"
+            style={{ color: "var(--ink-light)" }}
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to entry
           </button>
-          <h2 className="text-lg font-semibold text-stone-800 mb-6">Edit — {item.name}</h2>
+          <h2 className="font-serif text-xl font-bold mb-6" style={{ color: "var(--ink)" }}>
+            Edit — {item.name}
+          </h2>
           <EditItemForm
             item={item}
             userId={user?.uid ?? ""}
@@ -189,87 +216,252 @@ export default function ItemDetailPage() {
     );
   }
 
+  // ── Book page ────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen" style={{ background: "var(--parchment)" }}>
       <Header />
-      <main className="max-w-2xl mx-auto px-4 py-6">
-        <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-stone-500 hover:text-stone-800 mb-4 transition-colors">
-          <ArrowLeft className="w-4 h-4" />Back to inventory
+      <main className="max-w-xl mx-auto px-6 py-8">
+
+        {/* ── Back navigation ──────────────────────────────────── */}
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1 text-xs tracking-wide uppercase mb-8 transition-opacity hover:opacity-70"
+          style={{ color: "var(--ink-light)" }}
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Table of Contents
         </Link>
 
-        {/* Photo carousel */}
-        {item.photos.length > 0 && (
-          <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-stone-100 mb-6">
-            <Image src={item.photos[photoIndex]} alt={item.name} fill className="object-cover" />
-            {item.photos.length > 1 && (
-              <>
-                <button onClick={() => setPhotoIndex((i) => (i - 1 + item.photos.length) % item.photos.length)}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center">
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <button onClick={() => setPhotoIndex((i) => (i + 1) % item.photos.length)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center">
-                  <ChevronRight className="w-5 h-5" />
-                </button>
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-                  {item.photos.map((_, i) => (
-                    <button key={i} onClick={() => setPhotoIndex(i)}
-                      className={`w-2 h-2 rounded-full transition-all ${i === photoIndex ? "bg-white scale-125" : "bg-white/50"}`} />
-                  ))}
-                </div>
-              </>
-            )}
+        {/* ── Chapter rubric ───────────────────────────────────── */}
+        {zones.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {zones.map((zone) => (
+              <span
+                key={zone!.id}
+                className="text-xs tracking-wide"
+                style={{ color: "var(--gold)" }}
+              >
+                {zone!.icon} {zone!.label}
+              </span>
+            ))}
           </div>
         )}
 
-        {/* Title */}
-        <div className="flex items-start justify-between gap-3">
+        {/* ── Title ────────────────────────────────────────────── */}
+        <div className="flex items-start justify-between gap-4 mb-2">
           <div>
-            <h1 className="text-2xl font-bold text-stone-900">{item.name}</h1>
-            {item.description && <p className="text-stone-500 mt-1">{item.description}</p>}
+            <h1 className="font-serif text-3xl font-bold leading-tight" style={{ color: "var(--ink)" }}>
+              {item.name}
+            </h1>
+            {item.description && (
+              <p className="font-serif italic mt-2 text-base leading-relaxed" style={{ color: "var(--ink-mid)" }}>
+                {item.description}
+              </p>
+            )}
           </div>
-          <button onClick={() => setEditing(true)}
-            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-stone-600 hover:text-stone-900 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors">
-            <Pencil className="w-3.5 h-3.5" /> Edit
+          <button
+            onClick={() => setEditing(true)}
+            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium mt-1 transition-opacity hover:opacity-70"
+            style={{ color: "var(--ink-light)", background: "var(--parchment-dark)", border: "1px solid var(--border)" }}
+          >
+            <Pencil className="w-3 h-3" /> Edit
           </button>
         </div>
 
-        {/* Meta row */}
-        <div className="flex flex-wrap gap-3 mt-3 text-sm text-stone-400">
-          <span className="flex items-center gap-1">
-            <User className="w-3.5 h-3.5" />{item.addedByEmail}
-          </span>
-          {formattedDate && (
-            <span className="flex items-center gap-1">
-              <Calendar className="w-3.5 h-3.5" />{formattedDate}
-            </span>
-          )}
-          {item.isLoanable && (
-            <span className="text-emerald-600 font-medium">⟲ Available to borrow</span>
-          )}
-          {item.updatedByEmail && formattedUpdatedDate && (
-            <span className="flex items-center gap-1 text-stone-300">
-              Last edited by {item.updatedByEmail} on {formattedUpdatedDate}
-            </span>
-          )}
+        {/* ── Rule ─────────────────────────────────────────────── */}
+        <div className="h-px my-6" style={{ background: "var(--border)" }} />
+
+        {/* ── Photo — full bleed hero ───────────────────────────── */}
+        {item.photos.length > 0 && (
+          <figure className="mb-10 -mx-6">
+            <div className="relative" style={{ border: "1px solid var(--border)", borderRadius: "8px", overflow: "hidden" }}>
+              {/* Main photo */}
+              <div className="relative overflow-hidden" style={{ aspectRatio: "3/2" }}>
+                <Image
+                  src={item.photos[photoIndex]}
+                  alt={item.name}
+                  fill
+                  className="object-cover"
+                  priority
+                />
+                {/* Nav arrows */}
+                {item.photos.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => setPhotoIndex((i) => (i - 1 + item.photos.length) % item.photos.length)}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center"
+                      style={{ background: "rgba(44,36,22,0.55)", color: "#faf7f2" }}
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => setPhotoIndex((i) => (i + 1) % item.photos.length)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center"
+                      style={{ background: "rgba(44,36,22,0.55)", color: "#faf7f2" }}
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </>
+                )}
+              </div>
+              {/* Thumbnail strip for multiple photos */}
+              {item.photos.length > 1 && (
+                <div className="flex gap-1.5 p-2" style={{ background: "var(--parchment-dark)" }}>
+                  {item.photos.map((src, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setPhotoIndex(i)}
+                      className="relative shrink-0 overflow-hidden transition-opacity"
+                      style={{
+                        width: 48, height: 36,
+                        border: i === photoIndex ? "2px solid var(--gold)" : "1px solid var(--border)",
+                        opacity: i === photoIndex ? 1 : 0.65,
+                      }}
+                    >
+                      <Image src={src} alt="" fill className="object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <figcaption className="text-center text-xs italic mt-2 px-6" style={{ color: "var(--ink-light)" }}>
+              {item.name}
+            </figcaption>
+          </figure>
+        )}
+
+        {/* ── Story ────────────────────────────────────────────── */}
+        {item.story && (
+          <section className="mb-8">
+            <SectionRule label="Story" />
+            <p
+              className="font-serif text-base leading-8 drop-cap"
+              style={{ color: "var(--ink)" }}
+            >
+              {item.story}
+            </p>
+          </section>
+        )}
+
+        {/* ── Provenance ───────────────────────────────────────── */}
+        {item.provenance && (
+          <section className="mb-8">
+            <SectionRule label="Provenance" />
+            <p className="font-serif text-base leading-8" style={{ color: "var(--ink)" }}>
+              {item.provenance}
+            </p>
+          </section>
+        )}
+
+        {/* ── Annotations block ────────────────────────────────── */}
+        <div
+          className="my-8 p-5"
+          style={{ border: "1px solid var(--border)", background: "var(--parchment-light)" }}
+        >
+          <p
+            className="text-[9px] tracking-[0.25em] uppercase mb-2 font-semibold"
+            style={{ color: "var(--gold)" }}
+          >
+            Annotations
+          </p>
+          <div className="h-px mb-4" style={{ background: "var(--border)" }} />
+          <div className="space-y-2 text-xs font-serif" style={{ color: "var(--ink-mid)" }}>
+            {item.addedByEmail && (
+              <div className="flex gap-3">
+                <span className="w-20 shrink-0" style={{ color: "var(--ink-light)" }}>Added by</span>
+                <span>{item.addedByEmail.split("@")[0]}</span>
+              </div>
+            )}
+            {formattedDate && (
+              <div className="flex gap-3">
+                <span className="w-20 shrink-0" style={{ color: "var(--ink-light)" }}>On</span>
+                <span>{formattedDate}</span>
+              </div>
+            )}
+            {item.microLocation && (
+              <div className="flex gap-3">
+                <span className="w-20 shrink-0" style={{ color: "var(--ink-light)" }}>Storage</span>
+                <span className="flex items-center gap-1">
+                  <MapPin className="w-3 h-3 shrink-0" style={{ color: "var(--ink-light)" }} />
+                  {item.microLocation}
+                </span>
+              </div>
+            )}
+            {item.macroLocation && (
+              <div className="flex gap-3">
+                <span className="w-20 shrink-0" style={{ color: "var(--ink-light)" }}>City</span>
+                <span>{item.macroLocation}</span>
+              </div>
+            )}
+            {item.originPlace?.name && (
+              <div className="flex gap-3">
+                <span className="w-20 shrink-0" style={{ color: "var(--ink-light)" }}>Origin</span>
+                <span className="flex items-center gap-1">
+                  <Navigation className="w-3 h-3 shrink-0" style={{ color: "var(--gold)" }} />
+                  {item.originPlace.name}
+                  {osmUrl && (
+                    <a href={osmUrl} target="_blank" rel="noopener noreferrer"
+                      className="ml-1 underline" style={{ color: "var(--gold)" }}>
+                      ↗
+                    </a>
+                  )}
+                </span>
+              </div>
+            )}
+            {item.condition && (
+              <div className="flex gap-3">
+                <span className="w-20 shrink-0" style={{ color: "var(--ink-light)" }}>Condition</span>
+                <span>{item.condition}</span>
+              </div>
+            )}
+            {item.passTo && (
+              <div className="flex gap-3">
+                <span className="w-20 shrink-0" style={{ color: "var(--ink-light)" }}>Pass to</span>
+                <span className="flex items-center gap-1">
+                  <Heart className="w-3 h-3 shrink-0 text-rose-400" />
+                  {item.passTo}
+                </span>
+              </div>
+            )}
+            {item.isLoanable && (
+              <div className="flex gap-3">
+                <span className="w-20 shrink-0" style={{ color: "var(--ink-light)" }}>Lending</span>
+                <span>⟲ Available to borrow</span>
+              </div>
+            )}
+            {item.updatedByEmail && formattedUpdatedDate && (
+              <div className="flex gap-3 pt-2" style={{ borderTop: "1px solid var(--border)" }}>
+                <span className="w-20 shrink-0" style={{ color: "var(--ink-light)" }}>Revised</span>
+                <span>{item.updatedByEmail.split("@")[0]} · {formattedUpdatedDate}</span>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Categories */}
-        <div className="mt-4">
+        {/* ── Chapters (categories) ────────────────────────────── */}
+        <section className="mb-4">
+          <SectionRule label="Chapters" />
           {editingCategories ? (
-            <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4">
-              <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-3">Categories</p>
-              <CategoryPicker
-                selected={draftCategories}
-                onChange={setDraftCategories}
-              />
+            <div
+              className="p-4"
+              style={{ background: "var(--parchment-light)", border: "1px solid var(--border)" }}
+            >
+              <CategoryPicker selected={draftCategories} onChange={setDraftCategories} />
               <div className="flex gap-2 mt-4">
-                <button onClick={() => handleCategoriesSave(draftCategories)} disabled={savingCategories}
-                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-stone-200 disabled:text-stone-400 text-white text-sm font-semibold rounded-xl transition-colors">
+                <button
+                  onClick={() => handleCategoriesSave(draftCategories)}
+                  disabled={savingCategories}
+                  className="px-4 py-2 text-sm font-semibold transition-opacity hover:opacity-80 disabled:opacity-40"
+                  style={{ background: "var(--gold)", color: "var(--parchment-light)" }}
+                >
                   {savingCategories ? "Saving…" : "Save"}
                 </button>
-                <button onClick={() => setEditingCategories(false)} disabled={savingCategories}
-                  className="px-4 py-2 bg-white border border-stone-200 hover:bg-stone-50 text-stone-600 text-sm font-medium rounded-xl transition-colors">
+                <button
+                  onClick={() => setEditingCategories(false)}
+                  disabled={savingCategories}
+                  className="px-4 py-2 text-sm transition-opacity hover:opacity-70"
+                  style={{ color: "var(--ink-mid)", border: "1px solid var(--border)" }}
+                >
                   Cancel
                 </button>
               </div>
@@ -277,143 +469,131 @@ export default function ItemDetailPage() {
           ) : (
             <div className="flex flex-wrap gap-2 items-center">
               {zones.map((zone) => (
-                <span key={zone!.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-800 text-sm rounded-full font-medium">
+                <span
+                  key={zone!.id}
+                  className="text-xs px-3 py-1"
+                  style={{
+                    color: "var(--ink-mid)",
+                    background: "var(--parchment-dark)",
+                    border: "1px solid var(--border)",
+                  }}
+                >
                   {zone!.icon} {zone!.label}
                 </span>
               ))}
-                  <button onClick={() => { setDraftCategories([...item.categories]); setEditingCategories(true); }}
-                className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-stone-400 hover:text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-full transition-colors">
-                <Pencil className="w-3 h-3" /> Edit
+              <button
+                onClick={() => { setDraftCategories([...item.categories]); setEditingCategories(true); }}
+                className="flex items-center gap-1 text-xs px-2 py-1 transition-opacity hover:opacity-70"
+                style={{ color: "var(--ink-light)", background: "var(--parchment-dark)", border: "1px solid var(--border)" }}
+              >
+                <Pencil className="w-2.5 h-2.5" /> Edit
               </button>
             </div>
           )}
-        </div>
+        </section>
 
-        {/* Tags */}
-        <div className="mt-3">
+        {/* ── Tags ─────────────────────────────────────────────── */}
+        <section className="mb-8">
+          <SectionRule label="Tags" />
           {editingTags ? (
-            <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4">
-              <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-3">Tags</p>
+            <div
+              className="p-4"
+              style={{ background: "var(--parchment-light)", border: "1px solid var(--border)" }}
+            >
               <TagInput tags={draftTags} onChange={setDraftTags} />
               <div className="flex gap-2 mt-3">
-                <button onClick={() => handleTagsSave(draftTags)} disabled={savingTags}
-                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-stone-200 disabled:text-stone-400 text-white text-sm font-semibold rounded-xl transition-colors">
+                <button
+                  onClick={() => handleTagsSave(draftTags)}
+                  disabled={savingTags}
+                  className="px-4 py-2 text-sm font-semibold transition-opacity hover:opacity-80 disabled:opacity-40"
+                  style={{ background: "var(--gold)", color: "var(--parchment-light)" }}
+                >
                   {savingTags ? "Saving…" : "Save"}
                 </button>
-                <button onClick={() => setEditingTags(false)} disabled={savingTags}
-                  className="px-4 py-2 bg-white border border-stone-200 hover:bg-stone-50 text-stone-600 text-sm font-medium rounded-xl transition-colors">
+                <button
+                  onClick={() => setEditingTags(false)}
+                  disabled={savingTags}
+                  className="px-4 py-2 text-sm transition-opacity hover:opacity-70"
+                  style={{ color: "var(--ink-mid)", border: "1px solid var(--border)" }}
+                >
                   Cancel
                 </button>
               </div>
             </div>
           ) : (
-            <div className="flex flex-wrap gap-1.5 items-center">
-              {(item.tags ?? []).map((tag) => (
-                <span key={tag} className="px-2.5 py-1 bg-stone-100 text-stone-600 text-sm rounded-full">
-                  #{tag}
-                </span>
-              ))}
-              <button onClick={() => { setDraftTags([...(item.tags ?? [])]); setEditingTags(true); }}
-                className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-stone-400 hover:text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-full transition-colors">
+            <div className="flex flex-wrap gap-2 items-center">
+              {(item.tags ?? []).map((tag) => {
+                const s = tagStyle(tag);
+                return (
+                  <Link
+                    key={tag}
+                    href={`/search?q=${encodeURIComponent(tag)}`}
+                    className="text-sm font-medium px-3 py-1.5 transition-opacity hover:opacity-80"
+                    style={{ background: s.bg, color: s.color }}
+                  >
+                    #{tag}
+                  </Link>
+                );
+              })}
+              <button
+                onClick={() => { setDraftTags([...(item.tags ?? [])]); setEditingTags(true); }}
+                className="flex items-center gap-1 text-xs px-2.5 py-1.5 transition-opacity hover:opacity-70"
+                style={{ color: "var(--ink-light)", background: "var(--parchment-dark)", border: "1px solid var(--border)" }}
+              >
                 <Pencil className="w-3 h-3" />
                 {(item.tags ?? []).length === 0 ? "Add tags" : "Edit tags"}
               </button>
             </div>
           )}
-        </div>
-
-        {/* Location section */}
-        <section className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {item.microLocation && (
-            <div className="bg-stone-50 rounded-xl p-3">
-              <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-1">Storage spot</p>
-              <p className="text-sm text-stone-700 flex items-start gap-1">
-                <MapPin className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-stone-400" />
-                {item.microLocation}
-              </p>
-            </div>
-          )}
-          {item.macroLocation && (
-            <div className="bg-stone-50 rounded-xl p-3">
-              <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-1">Current city</p>
-              <p className="text-sm text-stone-700">{item.macroLocation}</p>
-            </div>
-          )}
-          {item.originPlace?.name && (
-            <div className="bg-stone-50 rounded-xl p-3">
-              <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-1">Origin</p>
-              <p className="text-sm text-stone-700 flex items-start gap-1">
-                <Navigation className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-amber-500" />
-                {item.originPlace.name}
-              </p>
-              {osmUrl && (
-                <a href={osmUrl} target="_blank" rel="noopener noreferrer"
-                  className="text-xs text-amber-600 hover:underline mt-1 block">
-                  View on map →
-                </a>
-              )}
-            </div>
-          )}
         </section>
 
-        {/* Object life */}
-        {(item.condition || item.passTo) && (
-          <section className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {item.condition && (
-              <div className="bg-stone-50 rounded-xl p-3">
-                <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-1">Condition</p>
-                <p className="text-sm text-stone-700">{item.condition}</p>
-              </div>
-            )}
-            {item.passTo && (
-              <div className="bg-stone-50 rounded-xl p-3">
-                <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-1">Pass to</p>
-                <p className="text-sm text-stone-700 flex items-center gap-1">
-                  <Heart className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
-                  {item.passTo}
-                </p>
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* Story */}
-        {item.story && (
-          <section className="mt-6">
-            <h2 className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-2">Story</h2>
-            <p className="text-stone-700 leading-relaxed">{item.story}</p>
-          </section>
-        )}
-
-        {/* Provenance */}
-        {item.provenance && (
-          <section className="mt-5">
-            <h2 className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-2">Provenance</h2>
-            <p className="text-stone-700 leading-relaxed">{item.provenance}</p>
-          </section>
-        )}
-
-        {/* Original transcript */}
+        {/* ── Original transcript ──────────────────────────────── */}
         {item.voiceTranscript && (
-          <details className="mt-6">
-            <summary className="text-sm text-stone-400 cursor-pointer hover:text-stone-600 select-none">
-              Original voice transcript
+          <details className="mb-8">
+            <summary
+              className="text-xs cursor-pointer select-none uppercase tracking-wide transition-opacity hover:opacity-70"
+              style={{ color: "var(--ink-light)" }}
+            >
+              Voice transcript
             </summary>
-            <blockquote className="mt-2 pl-3 border-l-2 border-stone-200 text-stone-500 text-sm italic leading-relaxed">
+            <blockquote
+              className="mt-3 pl-4 font-serif italic text-sm leading-7"
+              style={{ borderLeft: "2px solid var(--border)", color: "var(--ink-light)" }}
+            >
               {item.voiceTranscript}
             </blockquote>
           </details>
         )}
 
-        {/* Delete */}
-        <div className="mt-10 pt-6 border-t border-stone-100">
-          <button onClick={handleDelete} disabled={deleting}
-            className="flex items-center gap-2 text-sm text-red-400 hover:text-red-600 transition-colors disabled:opacity-50">
-            <Trash2 className="w-4 h-4" />
-            {deleting ? "Deleting..." : "Delete this item"}
+        {/* ── Delete ───────────────────────────────────────────── */}
+        <div className="pt-6" style={{ borderTop: "1px solid var(--border)" }}>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="flex items-center gap-2 text-xs transition-opacity hover:opacity-70 disabled:opacity-40"
+            style={{ color: "var(--ink-light)" }}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            {deleting ? "Deleting…" : "Delete this entry"}
           </button>
         </div>
       </main>
+    </div>
+  );
+}
+
+// ── Decorative section rule ──────────────────────────────────────────
+function SectionRule({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 mb-4">
+      <div className="h-px flex-1" style={{ background: "var(--border)" }} />
+      <h2
+        className="text-[9px] tracking-[0.3em] uppercase font-semibold shrink-0"
+        style={{ color: "var(--gold)" }}
+      >
+        {label}
+      </h2>
+      <div className="h-px flex-1" style={{ background: "var(--border)" }} />
     </div>
   );
 }

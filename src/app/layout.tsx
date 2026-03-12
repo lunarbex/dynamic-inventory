@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist } from "next/font/google";
+import { Geist, Lora, Caveat } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { InventoryProvider } from "@/context/InventoryContext";
@@ -10,9 +10,20 @@ const geist = Geist({
   subsets: ["latin"],
 });
 
+const lora = Lora({
+  variable: "--font-lora",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+});
+
+const caveat = Caveat({
+  variable: "--font-caveat",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
-  title: "Object Stories",
-  description: "A voice-first inventory of things that matter",
+  title: "InvenStories",
+  description: "A living inventory of things that matter",
   manifest: "/manifest.json",
 };
 
@@ -20,7 +31,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#f59e0b",
+  themeColor: "#8b6914",
 };
 
 export default function RootLayout({
@@ -30,21 +41,21 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${geist.variable} font-sans antialiased bg-stone-50 text-stone-900`}>
+      <body className={`${geist.variable} ${lora.variable} ${caveat.variable} font-sans antialiased`}>
         <AuthProvider>
           <InventoryProvider>
-          {children}
-          <Toaster
-            position="top-center"
-            toastOptions={{
-              style: {
-                borderRadius: "12px",
-                background: "#1c1917",
-                color: "#fafaf9",
-                fontSize: "14px",
-              },
-            }}
-          />
+            {children}
+            <Toaster
+              position="top-center"
+              toastOptions={{
+                style: {
+                  borderRadius: "6px",
+                  background: "#2c2416",
+                  color: "#faf7f2",
+                  fontSize: "13px",
+                },
+              }}
+            />
           </InventoryProvider>
         </AuthProvider>
       </body>

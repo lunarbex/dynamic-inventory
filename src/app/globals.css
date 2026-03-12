@@ -1,22 +1,59 @@
 @import "tailwindcss";
 
+/* ── Book / ricepaper palette ─────────────────────────────────── */
 :root {
-  --background: #fafaf9;
-  --foreground: #1c1917;
+  --parchment:       #f3f0eb;
+  --parchment-light: #f8f6f2;
+  --parchment-dark:  #e8e4dc;
+  --border:          #cfc8b8;
+  --ink:             #2c2416;
+  --ink-mid:         #6b5c3e;
+  --ink-light:       #a89070;
+  --gold:            #8b6914;
+  --gold-light:      #b8962e;
+
+  --background: var(--parchment);
+  --foreground: var(--ink);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
+  --font-serif: var(--font-lora);
+  --font-handwriting: var(--font-caveat);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background-color: var(--parchment);
+  color: var(--ink);
+
+  /* Ricepaper texture: fine noise grain + faint horizontal paper fibers */
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)' opacity='0.055'/%3E%3C/svg%3E"),
+    repeating-linear-gradient(
+      180deg,
+      transparent,
+      transparent 3px,
+      rgba(180, 168, 148, 0.045) 3px,
+      rgba(180, 168, 148, 0.045) 4px
+    );
+  background-repeat: repeat, repeat;
 }
 
-/* Hide scrollbars but keep scrolling */
+/* ── Drop cap for story prose ─────────────────────────────────── */
+.drop-cap::first-letter {
+  float: left;
+  font-family: var(--font-lora), Georgia, serif;
+  font-size: 3.6em;
+  line-height: 0.78;
+  padding-right: 0.08em;
+  padding-top: 0.06em;
+  color: var(--gold);
+  font-weight: 700;
+}
+
+/* ── Hide scrollbars but keep scrolling ───────────────────────── */
 .scrollbar-none {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -25,7 +62,13 @@ body {
   display: none;
 }
 
-/* Line clamp utility */
+/* ── Line clamp utilities ─────────────────────────────────────── */
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;

@@ -42,7 +42,7 @@ export function InventorySelector() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <BookOpen className="w-12 h-12 text-amber-500 mx-auto mb-3" />
-          <h1 className="text-2xl font-bold text-stone-900">Object Stories</h1>
+          <h1 className="text-2xl font-bold text-stone-900">InvenStories</h1>
           <p className="text-stone-500 text-sm mt-1">
             {inventories.length === 0
               ? "Create your first inventory to get started"

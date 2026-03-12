@@ -91,3 +91,39 @@ export interface UserStats {
   confirmationMode: ConfirmationMode;
   autoConfirmThreshold?: number;
 }
+
+// ── Agent system ──────────────────────────────────────────────────────
+export type AgentId =
+  | "story_listener"
+  | "pattern_recognition"
+  | "transition_doula"
+  | "relationship_mapper"
+  | "memory_keeper"
+  | "organizational_coach";
+
+export interface AgentPreference {
+  enabled: boolean;
+  settings: Record<string, string>;
+}
+
+export type UserAgentPreferences = Partial<Record<AgentId, AgentPreference>>;
+
+export type PatternType = "collection" | "relationship" | "gap" | "temporal" | "spatial";
+export type PatternConfidence = "high" | "medium" | "low";
+
+export interface PatternInsight {
+  id: string;
+  type: PatternType;
+  insight: string;
+  affectedItems: string[];
+  suggestedAction: string | null;
+  confidence: PatternConfidence;
+  generatedAt: Date;
+  dismissed?: boolean;
+}
+
+export interface PatternRecognitionResult {
+  insights: PatternInsight[];
+  lastRunAt: Date;
+  inventoryId: string;
+}

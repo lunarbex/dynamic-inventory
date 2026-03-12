@@ -15,10 +15,11 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { InventoryItem, UserStats, ConfirmationMode } from "./types";
+import type { InventoryItem, UserStats, ConfirmationMode, UserAgentPreferences, PatternRecognitionResult, PatternInsight } from "./types";
 
 const ITEMS_COLLECTION = "inventory_items";
 const USERS_COLLECTION = "user_stats";
+const USER_PREFS_COLLECTION = "user_preferences";
 
 function timestampToDate(ts: Timestamp | Date | undefined): Date {
   if (!ts) return new Date();
@@ -164,4 +165,46 @@ export async function incrementEntryCount(uid: string): Promise<number> {
   const newCount = stats.totalEntries + 1;
   await updateUserStats(uid, { totalEntries: newCount });
   return newCount;
+}
+
+export async function getAgentPreferences(uid: string): Promise<UserAgentPreferences> {
+  const snap = await getDoc(doc(db, USER_PREFS_COLLECTION, uid));
+  if (!snap.exists()) return {};
+  return (snap.data().agents ?? {}) as UserAgentPreferences;
+}
+
+export async function saveAgentPreferences(uid: string, agents: UserAgentPreferences): Promise<void> {
+  await setDoc(doc(db, USER_PREFS_COLLECTION, uid), { agents }, { merge: true });
+}
+
+export async function getPatternInsights(uid: string): Promise<PatternRecognitionResult | null> {
+  const snap = await getDoc(doc(db, USER_PREFS_COLLECTION, uid));
+  if (!snap.exists()) return null;
+  const data = snap.data().patternRecognition;
+  if (!data) return null;
+  return {
+    insights: (data.insights ?? []).map((i: Record<string, unknown>) => ({
+      ...i,
+      generatedAt: i.generatedAt instanceof Timestamp ? i.generatedAt.toDate() : new Date(i.generatedAt as string),
+    })) as PatternInsight[],
+    lastRunAt: data.lastRunAt instanceof Timestamp ? data.lastRunAt.toDate() : new Date(data.lastRunAt),
+    inventoryId: data.inventoryId ?? "",
+  };
+}
+
+export async function savePatternInsights(uid: string, result: PatternRecognitionResult): Promise<void> {
+  await setDoc(
+    doc(db, USER_PREFS_COLLECTION, uid),
+    { patternRecognition: { ...result, lastRunAt: serverTimestamp() } },
+    { merge: true }
+  );
+}
+
+export async function dismissPatternInsight(uid: string, insightId: string): Promise<void> {
+  const existing = await getPatternInsights(uid);
+  if (!existing) return;
+  const updated = existing.insights.map((i) =>
+    i.id === insightId ? { ...i, dismissed: true } : i
+  );
+  await savePatternInsights(uid, { ...existing, insights: updated });
 }

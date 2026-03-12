@@ -18,9 +18,11 @@ export function MapView({ items }: MapViewProps) {
 
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
+    let cancelled = false;
 
     // Dynamic import so Leaflet never runs on server
     import("leaflet").then((L) => {
+      if (cancelled || !mapRef.current || mapInstanceRef.current) return;
       // Fix default marker icons broken by webpack
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -64,6 +66,7 @@ export function MapView({ items }: MapViewProps) {
     });
 
     return () => {
+      cancelled = true;
       if (mapInstanceRef.current) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mapInstanceRef.current as any).remove();

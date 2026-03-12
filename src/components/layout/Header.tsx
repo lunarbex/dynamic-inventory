@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useAuthContext } from "@/components/auth/AuthProvider";
 import { useInventoryContext } from "@/context/InventoryContext";
 import { InvitePanel } from "@/components/inventory/InvitePanel";
-import { Search, Plus, Home, LogOut, Map, Users, ChevronDown } from "lucide-react";
+import { Search, Plus, Home, LogOut, Map, Users, ChevronDown, Sparkles } from "lucide-react";
 
 export function Header() {
   const { user, logOut } = useAuthContext();
@@ -15,88 +15,107 @@ export function Header() {
   const [showInvite, setShowInvite] = useState(false);
   const [showSwitcher, setShowSwitcher] = useState(false);
 
-  function navClass(path: string) {
-    return `p-2 rounded-lg transition-colors ${
-      pathname === path
-        ? "text-amber-600 bg-amber-50"
-        : "text-stone-500 hover:text-stone-800 hover:bg-stone-100"
-    }`;
-  }
-
   return (
     <>
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-sm border-b border-stone-200">
+      <header
+        className="sticky top-0 z-40 backdrop-blur-sm border-b"
+        style={{ background: "var(--parchment-light)", borderColor: "var(--border)" }}
+      >
         <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-          {/* Left: inventory name + switcher */}
-          {currentInventory ? (
-            <div className="relative">
-              <button
-                onClick={() => setShowSwitcher((s) => !s)}
-                className="flex items-center gap-1.5 text-stone-800 font-semibold text-base hover:text-amber-600 transition-colors"
-              >
-                {currentInventory.name}
-                {inventories.length > 1 && <ChevronDown className="w-4 h-4 text-stone-400" />}
-              </button>
-
-              {showSwitcher && inventories.length > 0 && (
-                <div className="absolute top-full left-0 mt-2 w-56 bg-white border border-stone-200 rounded-2xl shadow-lg overflow-hidden z-50">
-                  {inventories.map((inv) => (
-                    <button
-                      key={inv.id}
-                      onClick={() => { selectInventory(inv.id); setShowSwitcher(false); }}
-                      className={`w-full text-left px-4 py-3 text-sm transition-colors ${
-                        inv.id === currentInventory.id
-                          ? "bg-amber-50 text-amber-700 font-medium"
-                          : "text-stone-700 hover:bg-stone-50"
-                      }`}
-                    >
-                      {inv.name}
-                    </button>
-                  ))}
-                  <div className="border-t border-stone-100">
-                    <button
-                      onClick={() => { clearInventory(); setShowSwitcher(false); }}
-                      className="w-full text-left px-4 py-3 text-sm text-stone-500 hover:bg-stone-50 transition-colors"
-                    >
-                      Switch inventory…
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <Link href="/" className="font-semibold text-stone-800 text-lg">
-              Object Stories
+          {/* Left: brand + inventory name */}
+          <div className="relative flex items-center gap-2 min-w-0">
+            <Link href="/" className="font-serif font-bold shrink-0 tracking-tight" style={{ color: "var(--ink)", fontSize: "1rem" }}>
+              InvenStories
             </Link>
-          )}
 
-          <nav className="flex items-center gap-1">
-            <Link href="/" className={navClass("/")} title="Home">
+            {currentInventory && (
+              <>
+                <span className="select-none" style={{ color: "var(--border)" }}>|</span>
+                <button
+                  onClick={() => setShowSwitcher((s) => !s)}
+                  className="flex items-center gap-1 font-medium text-sm transition-colors truncate"
+                  style={{ color: "var(--ink-mid)" }}
+                >
+                  <span className="truncate">{currentInventory.name}</span>
+                  <ChevronDown className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--ink-light)" }} />
+                </button>
+
+                {showSwitcher && (
+                  <div
+                    className="absolute top-full left-0 mt-2 w-56 shadow-lg overflow-hidden z-50 border"
+                    style={{ background: "var(--parchment-light)", borderColor: "var(--border)", borderRadius: "4px" }}
+                  >
+                    {inventories.map((inv) => (
+                      <button
+                        key={inv.id}
+                        onClick={() => { selectInventory(inv.id); setShowSwitcher(false); }}
+                        className="w-full text-left px-4 py-3 text-sm transition-colors font-serif"
+                        style={{
+                          background: inv.id === currentInventory.id ? "var(--parchment-dark)" : "transparent",
+                          color: inv.id === currentInventory.id ? "var(--gold)" : "var(--ink-mid)",
+                          fontWeight: inv.id === currentInventory.id ? 600 : 400,
+                        }}
+                      >
+                        {inv.name}
+                      </button>
+                    ))}
+                    <div style={{ borderTop: "1px solid var(--border)" }}>
+                      <button
+                        onClick={() => { clearInventory(); setShowSwitcher(false); }}
+                        className="w-full text-left px-4 py-3 text-sm transition-colors"
+                        style={{ color: "var(--ink-light)" }}
+                      >
+                        Switch inventory…
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          <nav className="flex items-center gap-0.5">
+            <Link href="/" title="Table of Contents"
+              className="p-2 rounded transition-colors"
+              style={{ color: pathname === "/" ? "var(--gold)" : "var(--ink-light)" }}>
               <Home className="w-5 h-5" />
             </Link>
-            <Link href="/search" className={navClass("/search")} title="Search">
+            <Link href="/search" title="Search"
+              className="p-2 rounded transition-colors"
+              style={{ color: pathname === "/search" ? "var(--gold)" : "var(--ink-light)" }}>
               <Search className="w-5 h-5" />
             </Link>
-            <Link href="/map" className={navClass("/map")} title="Map">
+            <Link href="/map" title="Map"
+              className="p-2 rounded transition-colors"
+              style={{ color: pathname === "/map" ? "var(--gold)" : "var(--ink-light)" }}>
               <Map className="w-5 h-5" />
+            </Link>
+            <Link href="/settings" title="Agents"
+              className="p-2 rounded transition-colors"
+              style={{ color: pathname === "/settings" ? "var(--gold)" : "var(--ink-light)" }}>
+              <Sparkles className="w-5 h-5" />
             </Link>
             {currentInventory && (
               <button
                 onClick={() => setShowInvite(true)}
-                className="p-2 text-stone-500 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors"
+                className="p-2 rounded transition-colors"
+                style={{ color: "var(--ink-light)" }}
                 title="Members & sharing"
               >
                 <Users className="w-5 h-5" />
               </button>
             )}
-            <Link href="/add" className="ml-1 p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors" title="Add item">
-              <Plus className="w-5 h-5" />
+            <Link href="/add" title="Add entry"
+              className="ml-1 px-3 py-1.5 text-xs font-semibold rounded transition-opacity hover:opacity-80 flex items-center gap-1"
+              style={{ background: "var(--gold)", color: "var(--parchment-light)" }}>
+              <Plus className="w-3.5 h-3.5" /> Add
             </Link>
             {user && (
               <button onClick={() => logOut()}
-                className="ml-1 p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
+                className="ml-1 p-2 rounded transition-colors"
+                style={{ color: "var(--ink-light)" }}
                 title={`Sign out (${user.email})`}>
-                <LogOut className="w-5 h-5" />
+                <LogOut className="w-4 h-4" />
               </button>
             )}
           </nav>

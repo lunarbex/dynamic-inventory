@@ -131,7 +131,11 @@ export function AddItemFlow() {
   // ── Save ─────────────────────────────────────────────────────────────────
 
   async function save(confirmationMode: ConfirmationMode) {
-    if (!user || !extracted || !currentInventory) return;
+    if (!user || !extracted) return;
+    if (!currentInventory) {
+      toast.error("No inventory selected. Please go back and select one.");
+      return;
+    }
     setStep("saving");
 
     console.log("[AddItemFlow] save() — user:", user.uid);
