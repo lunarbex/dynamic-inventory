@@ -9,6 +9,9 @@ import { InventorySelector } from "@/components/inventory/InventorySelector";
 import { Header } from "@/components/layout/Header";
 import { ItemCard } from "@/components/inventory/ItemCard";
 import { useInventory } from "@/hooks/useInventory";
+import { useOnboarding } from "@/hooks/useOnboarding";
+import { WelcomeModal } from "@/components/onboarding/WelcomeModal";
+import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { ACTIVITY_ZONES, ActivityZoneId, InventoryItem } from "@/lib/types";
 import Link from "next/link";
 import { BookOpen, Plus, ArrowLeft } from "lucide-react";
@@ -112,6 +115,7 @@ function ItemSkeletons() {
 // ── Main page ──────────────────────────────────────────────────────
 export default function HomePage() {
   const { user, loading: authLoading } = useAuthContext();
+  const { showWelcome, runTour, dismissWelcome, startTour, finishTour } = useOnboarding(user?.uid ?? null);
   const { currentInventory, loadingInventories } = useInventoryContext();
   const { items, loading: itemsLoading } = useInventory(currentInventory?.id ?? null);
   const [activeZone, setActiveZone] = useState<ActivityZoneId | "all">("all");
@@ -140,6 +144,8 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen" style={{ background: "var(--parchment)" }}>
+      {showWelcome && <WelcomeModal onTakeTour={startTour} onSkip={dismissWelcome} />}
+      <OnboardingTour run={runTour} onFinish={finishTour} />
       <Header />
       <main className="max-w-2xl mx-auto px-4 py-6">
 
@@ -271,7 +277,7 @@ export default function HomePage() {
 
         ) : activeZone === "all" ? (
           /* ── Visual chapter grid ── */
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3" data-tour="chapter-grid">
             {chapters.map(({ zone, zoneIndex, chapterItems }) => (
               <ChapterCard
                 key={zone.id}

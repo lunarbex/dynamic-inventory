@@ -6,6 +6,8 @@ import { useInventoryContext } from "@/context/InventoryContext";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { Header } from "@/components/layout/Header";
 import { useInventory } from "@/hooks/useInventory";
+import { useOnboarding } from "@/hooks/useOnboarding";
+import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import {
   getAgentPreferences, saveAgentPreferences,
   getPatternInsights, savePatternInsights, dismissPatternInsight,
@@ -371,6 +373,7 @@ function AgentCard({
 // ── Page ───────────────────────────────────────────────────────────────
 export default function SettingsPage() {
   const { user, loading: authLoading } = useAuthContext();
+  const { runTour, finishTour, replayTour } = useOnboarding(user?.uid ?? null);
   const { currentInventory } = useInventoryContext();
   const { items } = useInventory(currentInventory?.id ?? null);
 
@@ -508,6 +511,7 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen" style={{ background: "var(--parchment)" }}>
+      <OnboardingTour run={runTour} onFinish={finishTour} />
       <Header />
       <main className="max-w-2xl mx-auto px-4 py-8">
 
@@ -575,6 +579,17 @@ export default function SettingsPage() {
         <p className="text-center text-xs mt-8" style={{ color: "var(--ink-light)" }}>
           More agents are in development. Each one is designed to deepen the archive, not automate it.
         </p>
+
+        {/* Replay tour */}
+        <div className="flex justify-center mt-6">
+          <button
+            onClick={replayTour}
+            className="text-xs transition-opacity hover:opacity-70 flex items-center gap-1.5"
+            style={{ color: "var(--ink-light)" }}
+          >
+            ↺ Replay onboarding tour
+          </button>
+        </div>
       </main>
     </div>
   );

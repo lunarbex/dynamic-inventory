@@ -31,6 +31,7 @@ export function Header() {
           <div className="relative flex items-center gap-2 min-w-0 flex-1">
             <Link
               href="/"
+              data-tour="brand"
               className="font-serif font-bold shrink-0 tracking-tight"
               style={{ color: "var(--ink)", fontSize: "1rem" }}
             >
@@ -42,6 +43,7 @@ export function Header() {
                 <span className="hidden sm:inline select-none" style={{ color: "var(--border)" }}>|</span>
                 <button
                   onClick={() => setShowSwitcher((s) => !s)}
+                  data-tour="inventory-switcher"
                   className="hidden sm:flex items-center gap-1 font-medium text-sm transition-colors min-w-0"
                   style={{ color: "var(--ink-mid)" }}
                 >
@@ -85,22 +87,22 @@ export function Header() {
 
           {/* ── Right: desktop nav ── */}
           <nav className="hidden sm:flex items-center gap-0.5 shrink-0">
-            <Link href="/" title="Home"
+            <Link href="/" title="Home" data-tour="nav-home"
               className="p-2 rounded transition-colors"
               style={{ color: navColor("/") }}>
               <Home className="w-5 h-5" />
             </Link>
-            <Link href="/search" title="Search"
+            <Link href="/search" title="Search" data-tour="nav-search"
               className="p-2 rounded transition-colors"
               style={{ color: navColor("/search") }}>
               <Search className="w-5 h-5" />
             </Link>
-            <Link href="/map" title="Map"
+            <Link href="/map" title="Map" data-tour="nav-map"
               className="p-2 rounded transition-colors"
               style={{ color: navColor("/map") }}>
               <Map className="w-5 h-5" />
             </Link>
-            <Link href="/settings" title="Agents"
+            <Link href="/settings" title="Agents" data-tour="nav-agents"
               className="p-2 rounded transition-colors"
               style={{ color: navColor("/settings") }}>
               <Sparkles className="w-5 h-5" />
@@ -115,7 +117,7 @@ export function Header() {
                 <Users className="w-5 h-5" />
               </button>
             )}
-            <Link href="/add" title="Add entry"
+            <Link href="/add" title="Add entry" data-tour="add-button"
               className="ml-1 px-3 py-1.5 text-xs font-semibold rounded transition-opacity hover:opacity-80 flex items-center gap-1"
               style={{ background: "var(--gold)", color: "var(--parchment-light)" }}>
               <Plus className="w-3.5 h-3.5" /> Add

@@ -15,7 +15,7 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { InventoryItem, UserStats, ConfirmationMode, UserAgentPreferences, PatternRecognitionResult, PatternInsight } from "./types";
+import type { InventoryItem, UserStats, ConfirmationMode, UserAgentPreferences, PatternRecognitionResult, PatternInsight, OnboardingState } from "./types";
 
 const ITEMS_COLLECTION = "inventory_items";
 const USERS_COLLECTION = "user_stats";
@@ -198,6 +198,20 @@ export async function savePatternInsights(uid: string, result: PatternRecognitio
     { patternRecognition: { ...result, lastRunAt: serverTimestamp() } },
     { merge: true }
   );
+}
+
+export async function getOnboardingState(uid: string): Promise<OnboardingState> {
+  const snap = await getDoc(doc(db, USER_PREFS_COLLECTION, uid));
+  const data = snap.exists() ? (snap.data().onboarding ?? {}) : {};
+  return {
+    hasSeenWelcome: data.hasSeenWelcome ?? false,
+    hasCompletedTour: data.hasCompletedTour ?? false,
+    hasAddedFirstItem: data.hasAddedFirstItem ?? false,
+  };
+}
+
+export async function updateOnboardingState(uid: string, updates: Partial<OnboardingState>): Promise<void> {
+  await setDoc(doc(db, USER_PREFS_COLLECTION, uid), { onboarding: updates }, { merge: true });
 }
 
 export async function dismissPatternInsight(uid: string, insightId: string): Promise<void> {

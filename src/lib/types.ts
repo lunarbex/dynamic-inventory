@@ -122,6 +122,12 @@ export interface PatternInsight {
   dismissed?: boolean;
 }
 
+export interface OnboardingState {
+  hasSeenWelcome: boolean;
+  hasCompletedTour: boolean;
+  hasAddedFirstItem: boolean;
+}
+
 export interface PatternRecognitionResult {
   insights: PatternInsight[];
   lastRunAt: Date;
