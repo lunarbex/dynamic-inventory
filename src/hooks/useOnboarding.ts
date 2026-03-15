@@ -51,8 +51,18 @@ export function useOnboarding(uid: string | null) {
   function replayTour() {
     setShowWelcome(false);
     setRunTour(false);
-    // slight delay so tour resets cleanly
     setTimeout(() => setRunTour(true), 100);
+  }
+
+  async function resetOnboarding() {
+    const fresh: OnboardingState = { hasSeenWelcome: false, hasCompletedTour: false, hasAddedFirstItem: false };
+    setState(fresh);
+    setRunTour(false);
+    setShowWelcome(false);
+    if (!uid) return;
+    await updateOnboardingState(uid, fresh);
+    // Show welcome modal after a tick so state settles
+    setTimeout(() => setShowWelcome(true), 100);
   }
 
   return {
@@ -64,5 +74,6 @@ export function useOnboarding(uid: string | null) {
     startTour,
     finishTour,
     replayTour,
+    resetOnboarding,
   };
 }

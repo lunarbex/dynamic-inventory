@@ -373,7 +373,7 @@ function AgentCard({
 // ── Page ───────────────────────────────────────────────────────────────
 export default function SettingsPage() {
   const { user, loading: authLoading } = useAuthContext();
-  const { runTour, finishTour, replayTour } = useOnboarding(user?.uid ?? null);
+  const { runTour, finishTour, replayTour, resetOnboarding } = useOnboarding(user?.uid ?? null);
   const { currentInventory } = useInventoryContext();
   const { items } = useInventory(currentInventory?.id ?? null);
 
@@ -581,13 +581,20 @@ export default function SettingsPage() {
         </p>
 
         {/* Replay tour */}
-        <div className="flex justify-center mt-6">
+        <div className="flex justify-center gap-6 mt-6">
           <button
             onClick={replayTour}
-            className="text-xs transition-opacity hover:opacity-70 flex items-center gap-1.5"
+            className="text-xs transition-opacity hover:opacity-70"
             style={{ color: "var(--ink-light)" }}
           >
-            ↺ Replay onboarding tour
+            ↺ Replay tour
+          </button>
+          <button
+            onClick={resetOnboarding}
+            className="text-xs transition-opacity hover:opacity-70"
+            style={{ color: "var(--ink-light)" }}
+          >
+            ↺ Reset onboarding
           </button>
         </div>
       </main>

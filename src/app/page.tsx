@@ -115,7 +115,12 @@ function ItemSkeletons() {
 // ── Main page ──────────────────────────────────────────────────────
 export default function HomePage() {
   const { user, loading: authLoading } = useAuthContext();
-  const { showWelcome, runTour, dismissWelcome, startTour, finishTour } = useOnboarding(user?.uid ?? null);
+  const { showWelcome, runTour, dismissWelcome, startTour, finishTour, resetOnboarding } = useOnboarding(user?.uid ?? null);
+
+  // Dev helper: window.__resetOnboarding() in browser console
+  if (typeof window !== "undefined") {
+    (window as Record<string, unknown>).__resetOnboarding = resetOnboarding;
+  }
   const { currentInventory, loadingInventories } = useInventoryContext();
   const { items, loading: itemsLoading } = useInventory(currentInventory?.id ?? null);
   const [activeZone, setActiveZone] = useState<ActivityZoneId | "all">("all");
