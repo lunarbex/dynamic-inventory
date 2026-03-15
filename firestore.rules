@@ -8,8 +8,21 @@ service cloud.firestore {
         && request.auth.uid in resource.data.memberIds;
       allow create: if request.auth != null
         && request.auth.uid in request.resource.data.memberIds;
-      allow update: if request.auth != null
-        && request.auth.uid in resource.data.memberIds;
+      allow update: if request.auth != null && (
+        // Existing member can make any update
+        request.auth.uid in resource.data.memberIds
+        ||
+        // New user self-joining via a valid invite code for this inventory
+        (
+          // They can only ADD themselves, not remove anyone
+          request.resource.data.memberIds.hasAll(resource.data.memberIds) &&
+          request.resource.data.memberIds.size() == resource.data.memberIds.size() + 1 &&
+          request.auth.uid in request.resource.data.memberIds &&
+          // The invite code they provided must point to this inventory
+          'inviteCode' in request.resource.data.members[request.auth.uid] &&
+          get(/databases/$(database)/documents/invite_codes/$(request.resource.data.members[request.auth.uid].inviteCode)).data.inventoryId == inventoryId
+        )
+      );
       allow delete: if request.auth != null
         && resource.data.createdBy == request.auth.uid;
     }

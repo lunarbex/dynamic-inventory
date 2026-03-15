@@ -164,7 +164,7 @@ export async function acceptInvite(
   }
 
   await updateDoc(invRef, {
-    [`members.${userId}`]: { userId, email, role, joinedAt: serverTimestamp() },
+    [`members.${userId}`]: { userId, email, role, joinedAt: serverTimestamp(), inviteCode: code },
     memberIds: [...(data.memberIds as string[]), userId],
   });
 
