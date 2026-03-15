@@ -119,7 +119,7 @@ export default function HomePage() {
 
   // Dev helper: window.__resetOnboarding() in browser console
   if (typeof window !== "undefined") {
-    (window as Record<string, unknown>).__resetOnboarding = resetOnboarding;
+    (window as unknown as Record<string, unknown>).__resetOnboarding = resetOnboarding;
   }
   const { currentInventory, loadingInventories } = useInventoryContext();
   const { items, loading: itemsLoading } = useInventory(currentInventory?.id ?? null);

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "driver.js/dist/driver.css";
 
 /* ── Book / ricepaper palette ─────────────────────────────────── */
 :root {
@@ -51,6 +52,77 @@ body {
   padding-top: 0.06em;
   color: var(--gold);
   font-weight: 700;
+}
+
+/* ── Driver.js tour — book aesthetic overrides ────────────────── */
+.invenstories-tour .driver-popover {
+  background: var(--parchment-light);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(44, 36, 22, 0.2);
+  padding: 18px 20px 14px;
+  min-width: 260px;
+  max-width: 320px;
+  font-family: inherit;
+}
+.invenstories-tour .driver-popover-title {
+  font-family: var(--font-lora), Georgia, serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+.invenstories-tour .driver-popover-description {
+  font-size: 0.8rem;
+  line-height: 1.65;
+  color: var(--ink-mid);
+  margin-bottom: 0;
+}
+.invenstories-tour .driver-popover-progress-text {
+  font-size: 0.7rem;
+  color: var(--ink-light);
+}
+.invenstories-tour .driver-popover-footer {
+  margin-top: 14px;
+  gap: 6px;
+}
+.invenstories-tour .driver-popover-next-btn,
+.invenstories-tour .driver-popover-done-btn {
+  background: var(--gold) !important;
+  border: none !important;
+  color: #faf7f2 !important;
+  border-radius: 5px !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  padding: 6px 14px !important;
+  text-shadow: none !important;
+}
+.invenstories-tour .driver-popover-prev-btn {
+  background: transparent !important;
+  border: 1px solid var(--border) !important;
+  color: var(--ink-light) !important;
+  border-radius: 5px !important;
+  font-size: 0.75rem !important;
+  padding: 6px 12px !important;
+  text-shadow: none !important;
+}
+.invenstories-tour .driver-popover-close-btn {
+  color: var(--ink-light) !important;
+  font-size: 1rem !important;
+  top: 10px !important;
+  right: 12px !important;
+}
+.invenstories-tour .driver-popover-arrow-side-top.driver-popover-arrow {
+  border-top-color: var(--parchment-light) !important;
+}
+.invenstories-tour .driver-popover-arrow-side-bottom.driver-popover-arrow {
+  border-bottom-color: var(--parchment-light) !important;
+}
+.invenstories-tour .driver-popover-arrow-side-left.driver-popover-arrow {
+  border-left-color: var(--parchment-light) !important;
+}
+.invenstories-tour .driver-popover-arrow-side-right.driver-popover-arrow {
+  border-right-color: var(--parchment-light) !important;
 }
 
 /* ── Hide scrollbars but keep scrolling ───────────────────────── */
