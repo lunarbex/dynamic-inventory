@@ -54,6 +54,8 @@ export function itemFromFirestore(id: string, data: Record<string, unknown>): In
     updatedByEmail: (data.updatedByEmail as string) ?? undefined,
     confirmationMode: (data.confirmationMode as ConfirmationMode) ?? "ask",
     autoConfirmAfterEntry: data.autoConfirmAfterEntry as number | undefined,
+    collectionId: (data.collectionId as string | null) ?? null,
+    isCollection: (data.isCollection as boolean) ?? false,
   };
 }
 

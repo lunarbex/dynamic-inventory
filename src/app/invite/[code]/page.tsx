@@ -10,6 +10,8 @@ import { acceptInvite } from "@/lib/inventories";
 import { useInventoryContext } from "@/context/InventoryContext";
 import { BookOpen, Loader2 } from "lucide-react";
 
+export const PENDING_INVITE_KEY = "pendingInviteCode";
+
 export default function InvitePage() {
   const { user, loading: authLoading } = useAuthContext();
   const { selectInventory } = useInventoryContext();
@@ -19,6 +21,11 @@ export default function InvitePage() {
 
   const [status, setStatus] = useState<"idle" | "joining" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+
+  // Persist the invite code so users who navigate away to sign up can still join.
+  useEffect(() => {
+    if (code) sessionStorage.setItem(PENDING_INVITE_KEY, code);
+  }, [code]);
 
   useEffect(() => {
     if (!user || status !== "idle") return;
@@ -31,6 +38,7 @@ export default function InvitePage() {
           return;
         }
         setStatus("success");
+        sessionStorage.removeItem(PENDING_INVITE_KEY);
         selectInventory(inv.id);
         setTimeout(() => router.push("/"), 1500);
       })

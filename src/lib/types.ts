@@ -83,6 +83,10 @@ export interface InventoryItem {
   updatedByEmail?: string;
   confirmationMode: ConfirmationMode;
   autoConfirmAfterEntry?: number;
+
+  // V2 collection hierarchy — stored now, UI built later
+  collectionId: string | null;  // parent collection item's ID, or null
+  isCollection: boolean;        // true if this item is itself a container
 }
 
 export interface UserStats {

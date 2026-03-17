@@ -171,6 +171,8 @@ export function AddItemFlow() {
         addedBy: user.uid,
         addedByEmail: user.email ?? "",
         confirmationMode,
+        collectionId: null,
+        isCollection: false,
       });
 
       console.log("[AddItemFlow] saved! id:", newId);

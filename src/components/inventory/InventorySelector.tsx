@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuthContext } from "@/components/auth/AuthProvider";
 import { useInventoryContext } from "@/context/InventoryContext";
 import { createInventory } from "@/lib/inventories";
+import { PENDING_INVITE_KEY } from "@/app/invite/[code]/page";
 import { BookOpen, Plus, Loader2, Users } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -13,6 +15,16 @@ export function InventorySelector() {
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [saving, setSaving] = useState(false);
+  const router = useRouter();
+
+  // If the user arrived here after signing up from outside the invite page,
+  // redirect them to finish the invite flow.
+  useEffect(() => {
+    const pendingCode = sessionStorage.getItem(PENDING_INVITE_KEY);
+    if (pendingCode) {
+      router.replace(`/invite/${pendingCode}`);
+    }
+  }, [router]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();

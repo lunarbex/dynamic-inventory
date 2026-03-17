@@ -9,6 +9,7 @@ import {
   where,
   onSnapshot,
   serverTimestamp,
+  arrayUnion,
   Timestamp,
 } from "firebase/firestore";
 import { db } from "./firebase";
@@ -153,20 +154,15 @@ export async function acceptInvite(
 
   const { inventoryId, role } = codeSnap.data() as { inventoryId: string; role: MemberRole };
 
+  // Use arrayUnion so we never need to read the inventory before updating.
+  // Non-members can't read inventories (Firestore rule), but the update rule
+  // allows self-joining when a valid invite code is supplied.
   const invRef = doc(db, INVENTORIES, inventoryId);
-  const invSnap = await getDoc(invRef);
-  if (!invSnap.exists()) return null;
-
-  const data = invSnap.data();
-  // Already a member — just return the inventory
-  if ((data.memberIds as string[]).includes(userId)) {
-    return inventoryFromFirestore(inventoryId, data as Record<string, unknown>);
-  }
-
   await updateDoc(invRef, {
     [`members.${userId}`]: { userId, email, role, joinedAt: serverTimestamp(), inviteCode: code },
-    memberIds: [...(data.memberIds as string[]), userId],
+    memberIds: arrayUnion(userId),
   });
 
+  // User is now a member — this read will succeed.
   return getInventory(inventoryId);
 }
