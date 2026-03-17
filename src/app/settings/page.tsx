@@ -11,10 +11,12 @@ import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import {
   getAgentPreferences, saveAgentPreferences,
   getPatternInsights, savePatternInsights, dismissPatternInsight,
+  getCartographerInsights, saveCartographerInsights, dismissCartographerInsight,
 } from "@/lib/firestore";
-import type { AgentId, UserAgentPreferences, PatternInsight, PatternRecognitionResult } from "@/lib/types";
+import type { AgentId, UserAgentPreferences, PatternInsight, PatternRecognitionResult, CartographicInsight, CartographicResult } from "@/lib/types";
 import { PatternInsightsPanel } from "@/components/agents/PatternInsightsPanel";
-import { ChevronDown, ChevronUp, Sparkles, Feather, Compass, LampDesk, GitBranch, Bookmark, Sprout } from "lucide-react";
+import { CartographerInsightsPanel } from "@/components/agents/CartographerInsightsPanel";
+import { ChevronDown, ChevronUp, Sparkles, Feather, Compass, Globe, LampDesk, GitBranch, Bookmark, Sprout } from "lucide-react";
 import toast from "react-hot-toast";
 
 // ── Agent definitions ──────────────────────────────────────────────────
@@ -67,7 +69,7 @@ const AGENTS: AgentDef[] = [
   {
     id: "pattern_recognition",
     name: "Pattern Recognition",
-    archetype: "The Cartographer",
+    archetype: "The Analyst",
     Icon: Compass,
     palette: { bg: "#f0f4f2", iconBg: "#dde8e4", iconColor: "#1e5040", accent: "#1e5040" },
     descriptor: "Maps the hidden connections between your belongings",
@@ -88,6 +90,33 @@ const AGENTS: AgentDef[] = [
         type: "select",
         options: ["Weekly", "Monthly", "On demand"],
         default: "Monthly",
+      },
+    ],
+  },
+  {
+    id: "cartographer",
+    name: "Cartographer",
+    archetype: "The Cartographer",
+    Icon: Globe,
+    palette: { bg: "#eff6ff", iconBg: "#dbeafe", iconColor: "#1d4ed8", accent: "#1d4ed8" },
+    descriptor: "Maps the geographic journeys of your belongings",
+    description: "Reads the places woven through your inventory — where objects came from, where they traveled, how they clustered — and surfaces the geographic stories hidden in your collection.",
+    principles: [
+      "Geography reveals story, but story matters more than coordinates",
+      "Place-based memory carries emotional weight — it is treated with care",
+      "Displacement and diaspora are named honestly, never romanticized",
+    ],
+    whenHelpful: "When your inventory includes items from travels, inheritance, or moves across cities/countries. Most powerful with 10+ items that have origin places.",
+    whenToDisable: "If you prefer to discover geographic patterns yourself, or if the geographic dimension of your collection isn't meaningful to you.",
+    status: "available",
+    defaultEnabled: false,
+    settings: [
+      {
+        key: "minCluster",
+        label: "Minimum cluster size",
+        type: "select",
+        options: ["2", "3", "5"],
+        default: "2",
       },
     ],
   },
@@ -383,14 +412,17 @@ export default function SettingsPage() {
 
   const [patternResult, setPatternResult] = useState<PatternRecognitionResult | null>(null);
   const [patternRunning, setPatternRunning] = useState(false);
+  const [cartResult, setCartResult] = useState<CartographicResult | null>(null);
+  const [cartRunning, setCartRunning] = useState(false);
 
-  // Load agent prefs + existing pattern insights
+  // Load agent prefs + existing insights
   useEffect(() => {
     if (!user) return;
     Promise.all([
       getAgentPreferences(user.uid),
       getPatternInsights(user.uid),
-    ]).then(([savedPrefs, savedInsights]) => {
+      getCartographerInsights(user.uid),
+    ]).then(([savedPrefs, savedInsights, savedCart]) => {
       const merged: UserAgentPreferences = {};
       for (const agent of AGENTS) {
         merged[agent.id] = savedPrefs[agent.id] ?? {
@@ -400,6 +432,7 @@ export default function SettingsPage() {
       }
       setPrefs(merged);
       if (savedInsights) setPatternResult(savedInsights);
+      if (savedCart) setCartResult(savedCart);
     }).finally(() => setLoading(false));
   }, [user]);
 
@@ -496,6 +529,60 @@ export default function SettingsPage() {
     await dismissPatternInsight(user.uid, insightId);
   }
 
+  const runCartographer = useCallback(async (showAll: boolean) => {
+    if (!currentInventory || items.length === 0) {
+      toast.error("No inventory items to analyze yet.");
+      return;
+    }
+    setCartRunning(true);
+    try {
+      const res = await fetch("/api/agents/cartographer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items, inventoryId: currentInventory.id, showAll }),
+      });
+      if (!res.ok) throw new Error("Analysis failed");
+      const data = await res.json();
+
+      const newInsights: CartographicInsight[] = data.insights ?? [];
+      if (newInsights.length === 0) {
+        toast("No geographic patterns found yet — add more items with origin places.", { icon: "🗺️" });
+        return;
+      }
+
+      const existing = cartResult?.insights ?? [];
+      const merged = [
+        ...newInsights,
+        ...existing.filter((e) => e.dismissed),
+      ];
+
+      const result: CartographicResult = {
+        insights: merged,
+        lastRunAt: new Date(),
+        inventoryId: currentInventory.id,
+      };
+      setCartResult(result);
+      await saveCartographerInsights(user!.uid, result);
+      toast.success(`${newInsights.length} geographic ${newInsights.length === 1 ? "pattern" : "patterns"} found`);
+    } catch {
+      toast.error("Cartographer analysis failed — try again later");
+    } finally {
+      setCartRunning(false);
+    }
+  }, [currentInventory, items, cartResult, user]);
+
+  async function handleCartDismiss(insightId: string) {
+    if (!cartResult || !user) return;
+    const updated: CartographicResult = {
+      ...cartResult,
+      insights: cartResult.insights.map((i) =>
+        i.id === insightId ? { ...i, dismissed: true } : i
+      ),
+    };
+    setCartResult(updated);
+    await dismissCartographerInsight(user.uid, insightId);
+  }
+
   if (authLoading || (user && loading)) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--parchment)" }}>
@@ -508,6 +595,7 @@ export default function SettingsPage() {
   if (!user) return <LoginForm />;
 
   const patternEnabled = prefs["pattern_recognition"]?.enabled ?? false;
+  const cartEnabled = prefs["cartographer"]?.enabled ?? false;
 
   return (
     <div className="min-h-screen" style={{ background: "var(--parchment)" }}>
@@ -556,7 +644,7 @@ export default function SettingsPage() {
               onToggle={(enabled) => handleToggle(agent.id, enabled)}
               onSettingChange={(key, value) => handleSettingChange(agent.id, key, value)}
             >
-              {/* Pattern Recognition gets an inline insights panel */}
+              {/* Pattern Recognition — inline insights panel */}
               {agent.id === "pattern_recognition" && patternEnabled && (
                 <PatternInsightsPanel
                   insights={patternResult?.insights ?? []}
@@ -570,6 +658,23 @@ export default function SettingsPage() {
               {agent.id === "pattern_recognition" && !patternEnabled && (
                 <p className="text-xs italic mt-2" style={{ color: "var(--ink-light)" }}>
                   Enable Pattern Recognition above to run an analysis.
+                </p>
+              )}
+
+              {/* Cartographer — inline geographic insights panel */}
+              {agent.id === "cartographer" && cartEnabled && (
+                <CartographerInsightsPanel
+                  insights={cartResult?.insights ?? []}
+                  lastRunAt={cartResult?.lastRunAt ?? null}
+                  running={cartRunning}
+                  onRunSingle={() => runCartographer(false)}
+                  onRunAll={() => runCartographer(true)}
+                  onDismiss={handleCartDismiss}
+                />
+              )}
+              {agent.id === "cartographer" && !cartEnabled && (
+                <p className="text-xs italic mt-2" style={{ color: "var(--ink-light)" }}>
+                  Enable the Cartographer above to map your objects' geographic journeys.
                 </p>
               )}
             </AgentCard>

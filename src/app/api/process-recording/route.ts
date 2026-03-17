@@ -61,10 +61,11 @@ STORY PRESERVATION
 
 SMART EXTRACTION RULES
 
-Locations — extract THREE separately from natural speech:
+Locations — extract FOUR separately from natural speech:
 - microLocation: where it physically lives right now ("top shelf of the hall closet," "the kitchen junk drawer," "in a box labeled 'camping' in the garage")
 - macroLocation: current city or region ("Portland, OR," "the Brooklyn apartment," "our place in Vermont")
-- originPlace: where it came from or was acquired ("a street market in Marrakech," "my grandmother's house in rural Ohio," "Powell's Books in Portland")
+- originPlace: descriptive text of where it came from or was acquired — preserve the story ("a street market in Marrakech," "my grandmother's house in rural Ohio," "Powell's Books in Portland")
+- originPlaceGeo: clean, geocodable place name extracted from originPlace — city, region, or country only, suitable for a maps API ("Marrakech, Morocco," "Ohio, USA," "Portland, Oregon"). If no location is mentioned, use empty string.
 
 Condition — infer from any descriptive language, not just the word "condition":
 - "it's a bit battered" → "well-loved, showing wear"
@@ -91,7 +92,8 @@ Respond ONLY with valid JSON matching this exact structure (no markdown, no expl
   "categories": ["category_id1"],
   "microLocation": "exact spot in the home",
   "macroLocation": "current city or region",
-  "originPlace": "where the item came from or was acquired",
+  "originPlace": "descriptive text of where it came from — preserve the story",
+  "originPlaceGeo": "clean geocodable place name for mapping (city/region/country), or empty string",
   "story": "the full story in the person's own voice — their words, feelings, and specific details",
   "provenance": "origin and acquisition history with names and places preserved",
   "passTo": "name and/or relationship of person who might receive this, or empty string",
@@ -127,10 +129,12 @@ If something isn't mentioned, use empty string for text fields, empty array for 
         )
       : ["other"];
 
-    // Geocode origin place via Nominatim (free, no API key)
+    // Geocode using the clean place name Claude extracted for mapping purposes.
+    // Fall back to the descriptive originPlace string if no clean name was provided.
     const originPlaceName: string = extracted.originPlace ?? "";
-    console.log("[API /process-recording] geocoding:", originPlaceName);
-    const coords = originPlaceName ? await geocode(originPlaceName) : null;
+    const geoQuery: string = (extracted.originPlaceGeo ?? "").trim() || originPlaceName;
+    console.log("[API /process-recording] geocoding:", geoQuery, "(raw originPlace:", originPlaceName, ")");
+    const coords = geoQuery ? await geocode(geoQuery) : null;
 
     const result = {
       extracted: {

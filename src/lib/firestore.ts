@@ -15,7 +15,7 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { InventoryItem, UserStats, ConfirmationMode, UserAgentPreferences, PatternRecognitionResult, PatternInsight, OnboardingState } from "./types";
+import type { InventoryItem, UserStats, ConfirmationMode, UserAgentPreferences, PatternRecognitionResult, PatternInsight, CartographicResult, CartographicInsight, OnboardingState } from "./types";
 
 const ITEMS_COLLECTION = "inventory_items";
 const USERS_COLLECTION = "user_stats";
@@ -215,6 +215,38 @@ export async function getOnboardingState(uid: string): Promise<OnboardingState> 
 
 export async function updateOnboardingState(uid: string, updates: Partial<OnboardingState>): Promise<void> {
   await setDoc(doc(db, USER_PREFS_COLLECTION, uid), { onboarding: updates }, { merge: true });
+}
+
+export async function getCartographerInsights(uid: string): Promise<CartographicResult | null> {
+  const snap = await getDoc(doc(db, USER_PREFS_COLLECTION, uid));
+  if (!snap.exists()) return null;
+  const data = snap.data().cartographer;
+  if (!data) return null;
+  return {
+    insights: (data.insights ?? []).map((i: Record<string, unknown>) => ({
+      ...i,
+      generatedAt: i.generatedAt instanceof Timestamp ? i.generatedAt.toDate() : new Date(i.generatedAt as string),
+    })) as CartographicInsight[],
+    lastRunAt: data.lastRunAt instanceof Timestamp ? data.lastRunAt.toDate() : new Date(data.lastRunAt),
+    inventoryId: data.inventoryId ?? "",
+  };
+}
+
+export async function saveCartographerInsights(uid: string, result: CartographicResult): Promise<void> {
+  await setDoc(
+    doc(db, USER_PREFS_COLLECTION, uid),
+    { cartographer: { ...result, lastRunAt: serverTimestamp() } },
+    { merge: true }
+  );
+}
+
+export async function dismissCartographerInsight(uid: string, insightId: string): Promise<void> {
+  const existing = await getCartographerInsights(uid);
+  if (!existing) return;
+  const updated = existing.insights.map((i) =>
+    i.id === insightId ? { ...i, dismissed: true } : i
+  );
+  await saveCartographerInsights(uid, { ...existing, insights: updated });
 }
 
 export async function dismissPatternInsight(uid: string, insightId: string): Promise<void> {

@@ -101,6 +101,7 @@ export interface UserStats {
 export type AgentId =
   | "story_listener"
   | "pattern_recognition"
+  | "cartographer"
   | "transition_doula"
   | "relationship_mapper"
   | "memory_keeper"
@@ -135,6 +136,33 @@ export interface OnboardingState {
 
 export interface PatternRecognitionResult {
   insights: PatternInsight[];
+  lastRunAt: Date;
+  inventoryId: string;
+}
+
+// ── Cartographer agent ─────────────────────────────────────────────────────
+export type CartographyType = "cluster" | "journey" | "diaspora" | "gap" | "complement";
+
+export interface CartographicPlace {
+  name: string;
+  lat?: number;
+  lng?: number;
+}
+
+export interface CartographicInsight {
+  id: string;
+  type: CartographyType;
+  insight: string;
+  places: CartographicPlace[];
+  affectedItems: string[];
+  suggestedAction: string | null;
+  confidence: PatternConfidence;
+  generatedAt: Date;
+  dismissed?: boolean;
+}
+
+export interface CartographicResult {
+  insights: CartographicInsight[];
   lastRunAt: Date;
   inventoryId: string;
 }
