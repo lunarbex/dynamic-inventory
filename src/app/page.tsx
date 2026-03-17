@@ -126,7 +126,7 @@ export default function HomePage() {
   const [activeZone, setActiveZone] = useState<ActivityZoneId | "all">("all");
 
   if (!authLoading && !user) return <LoginForm />;
-  if (!loadingInventories && !currentInventory) return <InventorySelector />;
+  if (!authLoading && !loadingInventories && !currentInventory) return <InventorySelector />;
 
   const isLoading = authLoading || itemsLoading;
 
