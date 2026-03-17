@@ -29,7 +29,7 @@ interface InventoryContextType {
 const InventoryContext = createContext<InventoryContextType | null>(null);
 
 export function InventoryProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuthContext();
+  const { user, loading: authLoading } = useAuthContext();
   const [inventories, setInventories] = useState<InventoryBook[]>([]);
   const [currentInventoryId, setCurrentInventoryId] = useState<string | null>(
     () => (typeof window !== "undefined" ? localStorage.getItem(LS_KEY) : null)
@@ -38,6 +38,12 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
   // Subscribe to user's inventories in real-time
   useEffect(() => {
+    // Don't do anything until Firebase has confirmed the auth state.
+    // Without this guard, there's a render where user=resolvedUser but
+    // loadingInventories is still false from the prior null-user branch,
+    // which causes a flash to InventorySelector before inventories load.
+    if (authLoading) return;
+
     if (!user) {
       setInventories([]);
       setLoadingInventories(false);
@@ -62,7 +68,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     });
     return unsub;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid]);
+  }, [user?.uid, authLoading]);
 
   const selectInventory = useCallback((id: string) => {
     setCurrentInventoryId(id);
