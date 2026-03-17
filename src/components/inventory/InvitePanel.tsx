@@ -87,9 +87,15 @@ export function InvitePanel({ onClose }: { onClose: () => void }) {
                 {m.email[0].toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-stone-800 truncate">{m.email}</p>
-                {m.userId === user?.uid && (
+                <p className="text-sm text-stone-800 truncate">{m.displayName || m.email}</p>
+                {m.displayName && (
+                  <p className="text-xs text-stone-400 truncate">{m.email}</p>
+                )}
+                {m.userId === user?.uid && !m.displayName && (
                   <p className="text-xs text-stone-400">You</p>
+                )}
+                {m.userId === user?.uid && m.displayName && (
+                  <p className="text-xs text-amber-500">You</p>
                 )}
               </div>
               {isAdmin && m.userId !== user?.uid ? (

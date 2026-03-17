@@ -77,6 +77,7 @@ export interface InventoryItem {
 
   addedBy: string;
   addedByEmail: string;
+  addedByName: string;
   addedAt: Date;
   updatedAt: Date;
   updatedBy?: string;

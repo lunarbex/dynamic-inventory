@@ -366,10 +366,10 @@ export default function ItemDetailPage() {
           </p>
           <div className="h-px mb-4" style={{ background: "var(--border)" }} />
           <div className="space-y-2 text-xs font-serif" style={{ color: "var(--ink-mid)" }}>
-            {item.addedByEmail && (
+            {(item.addedByName || item.addedByEmail) && (
               <div className="flex gap-3">
                 <span className="w-20 shrink-0" style={{ color: "var(--ink-light)" }}>Added by</span>
-                <span>{item.addedByEmail.split("@")[0]}</span>
+                <span>{item.addedByName || item.addedByEmail.split("@")[0]}</span>
               </div>
             )}
             {formattedDate && (

@@ -99,13 +99,20 @@ export function ItemCard({ item }: ItemCardProps) {
           </div>
         )}
 
-        {/* Location */}
-        {displayLocation && (
-          <p className="text-[10px] flex items-center gap-1 mt-auto pt-1" style={{ color: "var(--ink-light)" }}>
-            <MapPin className="w-2.5 h-2.5 shrink-0" />
-            <span className="truncate">{displayLocation}</span>
-          </p>
-        )}
+        {/* Location + attribution row */}
+        <div className="flex items-center justify-between mt-auto pt-1 gap-1">
+          {displayLocation ? (
+            <p className="text-[10px] flex items-center gap-1 min-w-0" style={{ color: "var(--ink-light)" }}>
+              <MapPin className="w-2.5 h-2.5 shrink-0" />
+              <span className="truncate">{displayLocation}</span>
+            </p>
+          ) : <span />}
+          {item.addedByName && (
+            <p className="text-[10px] shrink-0" style={{ color: "var(--ink-light)" }}>
+              {item.addedByName}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

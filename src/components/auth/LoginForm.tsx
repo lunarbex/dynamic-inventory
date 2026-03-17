@@ -4,11 +4,12 @@ import { useState } from "react";
 import { useAuthContext } from "./AuthProvider";
 import toast from "react-hot-toast";
 
-export function LoginForm() {
+export function LoginForm({ defaultMode = "signin" }: { defaultMode?: "signin" | "signup" }) {
   const { signIn, signUp, signInWithGoogle } = useAuthContext();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<"signin" | "signup">(defaultMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -18,7 +19,7 @@ export function LoginForm() {
       if (mode === "signin") {
         await signIn(email, password);
       } else {
-        await signUp(email, password);
+        await signUp(email, password, displayName);
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Authentication failed");
@@ -123,6 +124,29 @@ export function LoginForm() {
 
           {/* Email form */}
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+            {isSignUp && (
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: "var(--ink-mid)" }}>
+                  Your name
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Rebekah"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  required
+                  autoFocus
+                  className="w-full px-4 py-3 focus:outline-none"
+                  style={{
+                    background: "var(--parchment)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "7px",
+                    color: "var(--ink)",
+                    fontSize: "1rem",
+                  }}
+                />
+              </div>
+            )}
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold" style={{ color: "var(--ink-mid)" }}>
                 Email address

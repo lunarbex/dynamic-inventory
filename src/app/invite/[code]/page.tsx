@@ -30,7 +30,7 @@ export default function InvitePage() {
   useEffect(() => {
     if (!user || status !== "idle") return;
     setStatus("joining");
-    acceptInvite(code, user.uid, user.email ?? "")
+    acceptInvite(code, user.uid, user.email ?? "", user.displayName ?? undefined)
       .then((inv) => {
         if (!inv) {
           setErrorMsg("This invite link is invalid or has expired.");
@@ -72,7 +72,7 @@ export default function InvitePage() {
             Sign in or create an account to join
           </p>
         </div>
-        <LoginForm />
+        <LoginForm defaultMode="signup" />
       </div>
     );
   }

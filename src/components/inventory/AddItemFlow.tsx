@@ -170,6 +170,7 @@ export function AddItemFlow() {
         tags: extracted.tags,
         addedBy: user.uid,
         addedByEmail: user.email ?? "",
+        addedByName: user.displayName || user.email?.split("@")[0] || "",
         confirmationMode,
         collectionId: null,
         isCollection: false,

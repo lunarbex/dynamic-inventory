@@ -147,7 +147,8 @@ export async function createInviteCode(
 export async function acceptInvite(
   code: string,
   userId: string,
-  email: string
+  email: string,
+  displayName?: string
 ): Promise<InventoryBook | null> {
   const codeSnap = await getDoc(doc(db, INVITE_CODES, code));
   if (!codeSnap.exists()) return null;
@@ -159,7 +160,7 @@ export async function acceptInvite(
   // allows self-joining when a valid invite code is supplied.
   const invRef = doc(db, INVENTORIES, inventoryId);
   await updateDoc(invRef, {
-    [`members.${userId}`]: { userId, email, role, joinedAt: serverTimestamp(), inviteCode: code },
+    [`members.${userId}`]: { userId, email, role, joinedAt: serverTimestamp(), inviteCode: code, ...(displayName ? { displayName } : {}) },
     memberIds: arrayUnion(userId),
   });
 

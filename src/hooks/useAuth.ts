@@ -5,6 +5,7 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  updateProfile,
   signOut,
   GoogleAuthProvider,
   signInWithPopup,
@@ -30,8 +31,12 @@ export function useAuth() {
     return signInWithEmailAndPassword(auth, email, password);
   }
 
-  async function signUp(email: string, password: string) {
-    return createUserWithEmailAndPassword(auth, email, password);
+  async function signUp(email: string, password: string, displayName?: string) {
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    if (displayName?.trim()) {
+      await updateProfile(cred.user, { displayName: displayName.trim() });
+    }
+    return cred;
   }
 
   async function signInWithGoogle() {

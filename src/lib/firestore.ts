@@ -48,6 +48,7 @@ export function itemFromFirestore(id: string, data: Record<string, unknown>): In
     condition: (data.condition as string) ?? "",
     addedBy: (data.addedBy as string) ?? "",
     addedByEmail: (data.addedByEmail as string) ?? "",
+    addedByName: (data.addedByName as string) ?? "",
     addedAt: timestampToDate(data.addedAt as Timestamp),
     updatedAt: timestampToDate(data.updatedAt as Timestamp),
     updatedBy: (data.updatedBy as string) ?? undefined,
