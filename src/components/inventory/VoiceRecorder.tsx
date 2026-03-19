@@ -6,6 +6,7 @@ import { useRef, useState } from "react";
 
 interface VoiceRecorderProps {
   onTranscriptChange: (transcript: string) => void;
+  onAudioReady?: (blob: Blob) => void;
   onStop: () => void;
   onReset: () => void;
 }
@@ -16,9 +17,9 @@ function formatDuration(seconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export function VoiceRecorder({ onTranscriptChange, onStop, onReset }: VoiceRecorderProps) {
+export function VoiceRecorder({ onTranscriptChange, onAudioReady, onStop, onReset }: VoiceRecorderProps) {
   const { state, audioUrl, duration, speechSupported, error, start, stop, reset } =
-    useVoiceRecorder(onTranscriptChange);
+    useVoiceRecorder(onTranscriptChange, onAudioReady);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 

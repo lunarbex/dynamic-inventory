@@ -10,13 +10,13 @@ import { TagInput } from "./TagInput";
 import { useAuthContext } from "@/components/auth/AuthProvider";
 import { useInventoryContext } from "@/context/InventoryContext";
 import { addItem } from "@/lib/firestore";
-import { uploadPhotos } from "@/lib/storage";
+import { uploadPhotos, uploadAudio } from "@/lib/storage";
 import type { ActivityZoneId, ConfirmationMode, OriginPlace } from "@/lib/types";
 import {
   Loader2, ChevronRight, Check, Pencil, Clock,
 } from "lucide-react";
 
-type Step = "capture" | "processing" | "review" | "saving";
+type Step = "capture" | "transcribing" | "processing" | "review" | "saving";
 
 interface ExtractedState {
   transcript: string;
@@ -63,6 +63,8 @@ export function AddItemFlow() {
   const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
   const [transcript, setTranscript] = useState("");
   const [recordingStopped, setRecordingStopped] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [transcribeError, setTranscribeError] = useState<string | null>(null);
   const [extracted, setExtracted] = useState<ExtractedState | null>(null);
   const [editing, setEditing] = useState(false);
 
@@ -78,8 +80,44 @@ export function AddItemFlow() {
 
   const handleTranscriptChange = useCallback((t: string) => setTranscript(t), []);
 
-  function handleVoiceStop() { setRecordingStopped(true); }
-  function handleVoiceReset() { setTranscript(""); setRecordingStopped(false); }
+  const handleAudioReady = useCallback(async (blob: Blob) => {
+    setAudioBlob(blob);
+  }, []);
+
+  function handleVoiceStop() {
+    setRecordingStopped(true);
+  }
+
+  function handleVoiceReset() {
+    setTranscript("");
+    setRecordingStopped(false);
+    setAudioBlob(null);
+    setTranscribeError(null);
+  }
+
+  async function transcribeAudio(blob: Blob) {
+    setTranscribeError(null);
+    setStep("transcribing");
+    try {
+      const form = new FormData();
+      form.append("audio", blob, "recording.webm");
+      const res = await fetch("/api/transcribe-audio", { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `Transcription failed (${res.status})`);
+      if (data.transcript?.trim()) {
+        setTranscript(data.transcript.trim());
+      } else {
+        setTranscribeError("No speech detected in the recording. Please type your description below.");
+      }
+    } catch (err) {
+      console.error("[AddItemFlow] transcribeAudio error:", err);
+      setTranscribeError(
+        err instanceof Error ? err.message : "Transcription failed — please type your description below."
+      );
+    } finally {
+      setStep("capture");
+    }
+  }
 
   // ── Process ───────────────────────────────────────────────────────────────
 
@@ -149,6 +187,17 @@ export function AddItemFlow() {
         console.log("[AddItemFlow] photos uploaded:", photoUrls.length);
       }
 
+      let audioUrl: string | undefined;
+      if (audioBlob) {
+        setSavingStatus("Saving voice recording...");
+        try {
+          audioUrl = await uploadAudio(audioBlob, user.uid);
+          console.log("[AddItemFlow] audio uploaded:", audioUrl.slice(0, 80) + "...");
+        } catch (err) {
+          console.warn("[AddItemFlow] audio upload failed (non-fatal):", err);
+        }
+      }
+
       setSavingStatus("Saving to database...");
       console.log("[AddItemFlow] writing to Firestore...");
 
@@ -163,6 +212,7 @@ export function AddItemFlow() {
         macroLocation: extracted.macroLocation,
         originPlace: extracted.originPlace,
         photos: photoUrls,
+        audioUrl,
         voiceTranscript: extracted.transcript,
         passTo: extracted.passTo,
         isLoanable: extracted.isLoanable,
@@ -188,6 +238,16 @@ export function AddItemFlow() {
   }
 
   // ── Loading screens ───────────────────────────────────────────────────────
+
+  if (step === "transcribing") {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-4">
+        <Loader2 className="w-10 h-10 text-amber-500 animate-spin" />
+        <p className="text-stone-700 font-medium">Transcribing your recording…</p>
+        <p className="text-stone-400 text-sm">This usually takes 5–10 seconds</p>
+      </div>
+    );
+  }
 
   if (step === "processing") {
     return (
@@ -306,9 +366,9 @@ export function AddItemFlow() {
             </div>
           </div>
 
-          {/* Categories */}
+          {/* Activity / Type */}
           <div className="pt-1 border-t border-amber-200">
-            <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-2">Categories</p>
+            <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-2">Activity / Type</p>
             {editing ? (
               <CategoryPicker selected={extracted.categories}
                 onChange={(cats) => setExtracted((p) => p && ({ ...p, categories: cats }))} />
@@ -419,13 +479,40 @@ export function AddItemFlow() {
         <p className="text-xs text-stone-400">
           Speak naturally — what it is, where it&apos;s from, where you keep it, who might inherit it, whether friends can borrow it
         </p>
-        <VoiceRecorder onTranscriptChange={handleTranscriptChange} onStop={handleVoiceStop} onReset={handleVoiceReset} />
+        <VoiceRecorder
+          onTranscriptChange={handleTranscriptChange}
+          onAudioReady={handleAudioReady}
+          onStop={handleVoiceStop}
+          onReset={handleVoiceReset}
+        />
 
         {recordingStopped && (
-          <div className="space-y-1.5 mt-2">
+          <div className="space-y-2 mt-2">
+            {/* Transcription error — offer server transcription */}
+            {transcribeError && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800">
+                {transcribeError}
+              </div>
+            )}
+
+            {/* If no transcript yet and audio exists, offer server transcription */}
+            {!hasTranscript && !transcribeError && audioBlob && (
+              <div className="bg-stone-50 border border-stone-200 rounded-xl p-3 flex items-center justify-between gap-3">
+                <p className="text-sm text-stone-500">
+                  Live transcription unavailable — transcribe automatically or type below.
+                </p>
+                <button
+                  onClick={() => transcribeAudio(audioBlob)}
+                  className="shrink-0 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg transition-colors"
+                >
+                  Transcribe
+                </button>
+              </div>
+            )}
+
             <div className="flex items-center justify-between">
               <p className="text-xs font-medium text-stone-500">
-                {hasTranscript ? "Transcript (edit if needed)" : "No transcript captured — type your description"}
+                {hasTranscript ? "Transcript (edit if needed)" : "Type your description"}
               </p>
               {hasTranscript && <span className="text-xs text-emerald-600 font-medium">✓ Ready</span>}
             </div>

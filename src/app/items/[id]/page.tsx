@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -16,8 +16,8 @@ import { CategoryPicker } from "@/components/inventory/CategoryPicker";
 import { TagInput } from "@/components/inventory/TagInput";
 import { EditItemForm } from "@/components/inventory/EditItemForm";
 import {
-  ArrowLeft, ChevronLeft, ChevronRight, MapPin,
-  Navigation, Heart, Pencil, Trash2,
+  ArrowLeft, ChevronLeft, ChevronRight, Archive,
+  Navigation, Heart, Pencil, Trash2, Share2, Play, Pause,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -50,6 +50,9 @@ export default function ItemDetailPage() {
   const [editingTags, setEditingTags] = useState(false);
   const [savingTags, setSavingTags] = useState(false);
   const [draftTags, setDraftTags] = useState<string[]>([]);
+  const [audioPlaying, setAudioPlaying] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const id = params.id as string;
 
@@ -159,6 +162,30 @@ export default function ItemDetailPage() {
     }
   }
 
+  async function handleShare() {
+    const url = `${window.location.origin}/share/items/${id}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: item?.name ?? "An object story", url });
+      } catch { /* user cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }
+
+  function toggleAudio() {
+    if (!audioRef.current) return;
+    if (audioPlaying) {
+      audioRef.current.pause();
+      setAudioPlaying(false);
+    } else {
+      audioRef.current.play().catch(() => setAudioPlaying(false));
+      setAudioPlaying(true);
+    }
+  }
+
   async function handleDelete() {
     if (!confirm("Delete this entry? This cannot be undone.")) return;
     setDeleting(true);
@@ -259,13 +286,22 @@ export default function ItemDetailPage() {
               </p>
             )}
           </div>
-          <button
-            onClick={() => setEditing(true)}
-            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium mt-1 transition-opacity hover:opacity-70"
-            style={{ color: "var(--ink-light)", background: "var(--parchment-dark)", border: "1px solid var(--border)" }}
-          >
-            <Pencil className="w-3 h-3" /> Edit
-          </button>
+          <div className="flex items-center gap-1.5 mt-1 shrink-0">
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-70"
+              style={{ color: "var(--ink-light)", background: "var(--parchment-dark)", border: "1px solid var(--border)" }}
+            >
+              <Share2 className="w-3 h-3" /> {copied ? "Copied!" : "Share"}
+            </button>
+            <button
+              onClick={() => setEditing(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-70"
+              style={{ color: "var(--ink-light)", background: "var(--parchment-dark)", border: "1px solid var(--border)" }}
+            >
+              <Pencil className="w-3 h-3" /> Edit
+            </button>
+          </div>
         </div>
 
         {/* ── Rule ─────────────────────────────────────────────── */}
@@ -340,6 +376,25 @@ export default function ItemDetailPage() {
             >
               {item.story}
             </p>
+            {/* Audio playback — hear the original voice recording */}
+            {item.audioUrl && (
+              <div className="mt-4 flex items-center gap-3">
+                <button
+                  onClick={toggleAudio}
+                  className="flex items-center gap-2 px-4 py-2 text-xs font-medium transition-opacity hover:opacity-75"
+                  style={{ border: "1px solid var(--border)", color: "var(--ink-mid)", background: "var(--parchment-light)" }}
+                >
+                  {audioPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                  {audioPlaying ? "Pause" : "Listen to original recording"}
+                </button>
+                <audio
+                  ref={audioRef}
+                  src={item.audioUrl}
+                  onEnded={() => setAudioPlaying(false)}
+                  className="hidden"
+                />
+              </div>
+            )}
           </section>
         )}
 
@@ -382,7 +437,7 @@ export default function ItemDetailPage() {
               <div className="flex gap-3">
                 <span className="w-20 shrink-0" style={{ color: "var(--ink-light)" }}>Storage</span>
                 <span className="flex items-center gap-1">
-                  <MapPin className="w-3 h-3 shrink-0" style={{ color: "var(--ink-light)" }} />
+                  <Archive className="w-3 h-3 shrink-0" style={{ color: "var(--ink-light)" }} />
                   {item.microLocation}
                 </span>
               </div>

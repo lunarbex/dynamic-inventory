@@ -6,11 +6,14 @@ import type { PatternInsight, PatternType } from "@/lib/types";
 import { X, ChevronRight } from "lucide-react";
 
 const TYPE_META: Record<PatternType, { label: string; icon: string; color: string }> = {
-  collection: { label: "Collection",   icon: "📚", color: "#6b4010" },
-  relationship: { label: "Relationship", icon: "🕸️", color: "#1e5040" },
-  gap:          { label: "Gap",          icon: "◌",  color: "#661830" },
-  temporal:     { label: "Time pattern", icon: "🕰️", color: "#342070" },
-  spatial:      { label: "Space pattern",icon: "📍", color: "#30561e" },
+  collection:             { label: "Collection",          icon: "📚", color: "#6b4010" },
+  relationship:           { label: "Relationship",        icon: "🕸️", color: "#1e5040" },
+  gap:                    { label: "Gap",                 icon: "◌",  color: "#661830" },
+  temporal:               { label: "Time pattern",        icon: "🕰️", color: "#342070" },
+  spatial:                { label: "Space pattern",       icon: "📍", color: "#30561e" },
+  scattered_collection:   { label: "Scattered collection",icon: "🗂️", color: "#5a3080" },
+  distributed_category:   { label: "Distributed category",icon: "🔀", color: "#1a4060" },
+  recipient_organization: { label: "Inheritance planning",icon: "🎁", color: "#804010" },
 };
 
 const CONFIDENCE_STYLE: Record<string, { bg: string; color: string }> = {

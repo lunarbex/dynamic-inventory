@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useAuthContext } from "@/components/auth/AuthProvider";
 import { useInventoryContext } from "@/context/InventoryContext";
 import { InvitePanel } from "@/components/inventory/InvitePanel";
-import { Search, Plus, Home, LogOut, Map, Users, ChevronDown, Sparkles, Menu, X } from "lucide-react";
+import { Search, Plus, Home, LogOut, Map, Users, ChevronDown, Sparkles, Menu, X, Share2 } from "lucide-react";
 
 export function Header() {
   const { user, logOut } = useAuthContext();
@@ -15,6 +15,16 @@ export function Header() {
   const [showInvite, setShowInvite] = useState(false);
   const [showSwitcher, setShowSwitcher] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+
+  async function shareApp() {
+    const url = window.location.origin;
+    if (navigator.share) {
+      try { await navigator.share({ title: "InvenStories", text: "Preserve the stories behind your objects.", url }); }
+      catch { /* cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(url);
+    }
+  }
 
   const navColor = (path: string) =>
     pathname === path ? "var(--gold)" : "var(--ink-light)";
@@ -234,6 +244,15 @@ export function Header() {
                 Members & sharing
               </button>
             )}
+
+            <button
+              onClick={() => { shareApp(); setShowMenu(false); }}
+              className="w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors"
+              style={{ color: "var(--ink-mid)", borderBottom: "1px solid var(--border)" }}
+            >
+              <Share2 className="w-4 h-4" />
+              Share InvenStories
+            </button>
 
             {user && (
               <button

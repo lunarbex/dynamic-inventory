@@ -274,8 +274,8 @@ export function EditItemForm({ item, userId, userEmail, onSave, onCancel }: Edit
         </button>
       </Section>
 
-      {/* Categories */}
-      <Section title="Categories">
+      {/* Activity / Type */}
+      <Section title="Activity / Type">
         <CategoryPicker selected={fields.categories}
           onChange={(cats) => set("categories", cats)} />
       </Section>

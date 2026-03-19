@@ -90,6 +90,11 @@ export function subscribeToUserInventories(
     where("memberIds", "array-contains", userId)
   );
   return onSnapshot(q, (snap) => {
+    // Skip empty results that came from cache — on iOS/mobile, IndexedDB is often
+    // cleared between sessions, so the first snapshot is empty-from-cache while
+    // real server data is still in flight. Without this guard the app flashes
+    // InventorySelector before inventories arrive from the server.
+    if (snap.empty && snap.metadata.fromCache) return;
     callback(snap.docs.map((d) => inventoryFromFirestore(d.id, d.data() as Record<string, unknown>)));
   });
 }
@@ -142,6 +147,13 @@ export async function createInviteCode(
     createdAt: serverTimestamp(),
   });
   return code;
+}
+
+export async function updateInventorySettings(
+  id: string,
+  settings: NonNullable<InventoryBook["settings"]>
+): Promise<void> {
+  await updateDoc(doc(db, INVENTORIES, id), { settings });
 }
 
 export async function acceptInvite(

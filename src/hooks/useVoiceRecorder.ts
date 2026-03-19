@@ -43,7 +43,8 @@ function getBestMimeType(): string {
 }
 
 export function useVoiceRecorder(
-  onTranscriptUpdate?: (transcript: string) => void
+  onTranscriptUpdate?: (transcript: string) => void,
+  onAudioReady?: (blob: Blob) => void
 ) {
   const [state, setState] = useState<RecordingState>("idle");
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -60,6 +61,8 @@ export function useVoiceRecorder(
   const finalTranscriptRef = useRef("");
   const onTranscriptUpdateRef = useRef(onTranscriptUpdate);
   onTranscriptUpdateRef.current = onTranscriptUpdate;
+  const onAudioReadyRef = useRef(onAudioReady);
+  onAudioReadyRef.current = onAudioReady;
 
   const start = useCallback(async () => {
     setError(null);
@@ -92,6 +95,8 @@ export function useVoiceRecorder(
         setAudioBlob(blob);
         setAudioUrl(url);
         stream.getTracks().forEach((t) => t.stop());
+        // Notify parent so it can auto-transcribe if speech recognition wasn't available
+        onAudioReadyRef.current?.(blob);
       };
 
       recorder.start(250);
@@ -123,8 +128,11 @@ export function useVoiceRecorder(
           onTranscriptUpdateRef.current?.(full);
         };
 
-        recognition.onerror = () => {
-          // Silently fail — user can type manually
+        recognition.onerror = (event: Event) => {
+          // Log but don't set error state — audio recording continues regardless.
+          // Parent will detect empty transcript after stop and offer server transcription.
+          const errorEvent = event as Event & { error?: string };
+          console.warn("[useVoiceRecorder] SpeechRecognition error:", errorEvent.error);
         };
 
         recognition.start();

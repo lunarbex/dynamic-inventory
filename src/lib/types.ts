@@ -19,6 +19,7 @@ export interface InventoryBook {
   members: Record<string, InventoryMember>;   // keyed by userId
   settings?: {
     agentEnabled?: boolean;
+    customChapters?: CustomChapter[];
   };
 }
 
@@ -49,6 +50,15 @@ export interface OriginPlace {
   lng?: number;
 }
 
+export interface CustomChapter {
+  id: string;
+  name: string;
+  icon?: string;
+  filterTags?: string[];
+  filterCategories?: ActivityZoneId[];
+  filterPassTo?: string;
+}
+
 export interface InventoryItem {
   id: string;
   inventoryId: string;
@@ -67,6 +77,7 @@ export interface InventoryItem {
   location?: string;
 
   photos: string[];       // Firebase Storage URLs
+  audioUrl?: string;      // original voice recording in Firebase Storage
   voiceTranscript: string;
   tags: string[];         // free-form user-defined tags
 
@@ -114,7 +125,15 @@ export interface AgentPreference {
 
 export type UserAgentPreferences = Partial<Record<AgentId, AgentPreference>>;
 
-export type PatternType = "collection" | "relationship" | "gap" | "temporal" | "spatial";
+export type PatternType =
+  | "collection"
+  | "relationship"
+  | "gap"
+  | "temporal"
+  | "spatial"
+  | "scattered_collection"
+  | "distributed_category"
+  | "recipient_organization";
 export type PatternConfidence = "high" | "medium" | "low";
 
 export interface PatternInsight {

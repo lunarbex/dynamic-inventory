@@ -27,11 +27,19 @@ service cloud.firestore {
         && resource.data.createdBy == request.auth.uid;
     }
 
-    // Inventory items — readable/writable only by members of the parent inventory
+    // Inventory items — readable/writable only by members of the parent inventory,
+    // OR publicly readable by anyone (for shared story links, no account required).
     match /inventory_items/{itemId} {
-      allow read: if request.auth != null
-        && exists(/databases/$(database)/documents/inventories/$(resource.data.inventoryId))
-        && request.auth.uid in get(/databases/$(database)/documents/inventories/$(resource.data.inventoryId)).data.memberIds;
+      allow read: if
+        // Unauthenticated / public share — anyone with the item ID can view
+        request.auth == null
+        ||
+        // Authenticated member of the inventory
+        (
+          request.auth != null
+          && exists(/databases/$(database)/documents/inventories/$(resource.data.inventoryId))
+          && request.auth.uid in get(/databases/$(database)/documents/inventories/$(resource.data.inventoryId)).data.memberIds
+        );
       allow create: if request.auth != null
         && exists(/databases/$(database)/documents/inventories/$(request.resource.data.inventoryId))
         && request.auth.uid in get(/databases/$(database)/documents/inventories/$(request.resource.data.inventoryId)).data.memberIds;

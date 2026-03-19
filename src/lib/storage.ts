@@ -19,6 +19,15 @@ export async function uploadPhoto(file: File, userId: string): Promise<string> {
   }
 }
 
+export async function uploadAudio(blob: Blob, userId: string): Promise<string> {
+  const ext = blob.type.includes("mp4") ? "m4a" : "webm";
+  const path = `audio/${userId}/${uuidv4()}.${ext}`;
+  console.log("[Storage] uploadAudio — path:", path, "size:", blob.size, "type:", blob.type);
+  const storageRef = ref(storage, path);
+  await uploadBytes(storageRef, blob);
+  return getDownloadURL(storageRef);
+}
+
 export async function uploadPhotos(files: File[], userId: string): Promise<string[]> {
   console.log("[Storage] uploadPhotos — uploading", files.length, "files for user:", userId);
   return Promise.all(files.map((f) => uploadPhoto(f, userId)));

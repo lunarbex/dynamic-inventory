@@ -41,6 +41,7 @@ export function itemFromFirestore(id: string, data: Record<string, unknown>): In
     originPlace: (data.originPlace as InventoryItem["originPlace"]) ?? { name: "" },
     location: (data.location as string) ?? "",
     photos: (data.photos as string[]) ?? [],
+    audioUrl: (data.audioUrl as string | undefined) ?? undefined,
     voiceTranscript: (data.voiceTranscript as string) ?? "",
     tags: (data.tags as string[]) ?? [],
     passTo: (data.passTo as string) ?? "",
