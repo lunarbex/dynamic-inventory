@@ -108,7 +108,7 @@ export default function SharedItemPage() {
     .filter(Boolean);
 
   const formattedDate = item.addedAt
-    ? new Intl.DateTimeFormat("en-US", { year: "numeric", month: "long", day: "numeric" }).format(item.addedAt)
+    ? new Intl.DateTimeFormat("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" }).format(item.addedAt)
     : "";
 
   return (

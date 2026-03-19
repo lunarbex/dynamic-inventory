@@ -31,9 +31,15 @@ const InventoryContext = createContext<InventoryContextType | null>(null);
 export function InventoryProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuthContext();
   const [inventories, setInventories] = useState<InventoryBook[]>([]);
-  const [currentInventoryId, setCurrentInventoryId] = useState<string | null>(
-    () => (typeof window !== "undefined" ? localStorage.getItem(LS_KEY) : null)
-  );
+  // Always start with null — reading localStorage in the initializer causes a
+  // hydration mismatch (#300) because SSR renders null while the client renders
+  // the stored value. The effect below syncs from localStorage after mount.
+  const [currentInventoryId, setCurrentInventoryId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(LS_KEY);
+    if (stored) setCurrentInventoryId(stored);
+  }, []);
   const [loadingInventories, setLoadingInventories] = useState(true);
 
   // Subscribe to user's inventories in real-time

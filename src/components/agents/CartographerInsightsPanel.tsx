@@ -55,7 +55,7 @@ export function CartographerInsightsPanel({
           </p>
           {lastRunAt && (
             <p className="text-[10px] mt-0.5" style={{ color: "#64748b" }}>
-              Last mapped {lastRunAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+              Last mapped {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(lastRunAt)}
               {" · "}{activeCount} active {activeCount === 1 ? "pattern" : "patterns"}
             </p>
           )}

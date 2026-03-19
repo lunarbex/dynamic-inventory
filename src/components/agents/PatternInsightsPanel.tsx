@@ -58,7 +58,7 @@ export function PatternInsightsPanel({
           </p>
           {lastRunAt && (
             <p className="text-[10px] mt-0.5" style={{ color: "var(--ink-light)" }}>
-              Last run {lastRunAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+              Last run {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(lastRunAt)}
               {" · "}{activeCount} active {activeCount === 1 ? "insight" : "insights"}
             </p>
           )}

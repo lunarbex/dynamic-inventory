@@ -204,10 +204,10 @@ export default function ItemDetailPage() {
     .filter(Boolean);
 
   const formattedDate = item.addedAt
-    ? new Intl.DateTimeFormat("en-US", { year: "numeric", month: "long", day: "numeric" }).format(item.addedAt)
+    ? new Intl.DateTimeFormat("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" }).format(item.addedAt)
     : "";
   const formattedUpdatedDate = item.updatedAt
-    ? new Intl.DateTimeFormat("en-US", { year: "numeric", month: "short", day: "numeric" }).format(item.updatedAt)
+    ? new Intl.DateTimeFormat("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" }).format(item.updatedAt)
     : "";
 
   const hasOriginCoords = item.originPlace?.lat && item.originPlace?.lng;

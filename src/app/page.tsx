@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -276,9 +276,9 @@ export default function HomePage() {
   const { user, loading: authLoading } = useAuthContext();
   const { showWelcome, runTour, dismissWelcome, startTour, finishTour, resetOnboarding } = useOnboarding(user?.uid ?? null);
 
-  if (typeof window !== "undefined") {
+  useEffect(() => {
     (window as unknown as Record<string, unknown>).__resetOnboarding = resetOnboarding;
-  }
+  }, [resetOnboarding]);
 
   const { currentInventory, loadingInventories } = useInventoryContext();
   const { items, loading: itemsLoading } = useInventory(currentInventory?.id ?? null);
