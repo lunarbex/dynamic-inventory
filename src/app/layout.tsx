@@ -3,6 +3,7 @@ import { Geist, Lora, Caveat } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { InventoryProvider } from "@/context/InventoryContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Toaster } from "react-hot-toast";
 
 const geist = Geist({
@@ -42,22 +43,24 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geist.variable} ${lora.variable} ${caveat.variable} font-sans antialiased`}>
-        <AuthProvider>
-          <InventoryProvider>
-            {children}
-            <Toaster
-              position="top-center"
-              toastOptions={{
-                style: {
-                  borderRadius: "6px",
-                  background: "#2c2416",
-                  color: "#faf7f2",
-                  fontSize: "13px",
-                },
-              }}
-            />
-          </InventoryProvider>
-        </AuthProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <InventoryProvider>
+              {children}
+              <Toaster
+                position="top-center"
+                toastOptions={{
+                  style: {
+                    borderRadius: "6px",
+                    background: "#2c2416",
+                    color: "#faf7f2",
+                    fontSize: "13px",
+                  },
+                }}
+              />
+            </InventoryProvider>
+          </AuthProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );
