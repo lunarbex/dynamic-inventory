@@ -50,23 +50,45 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       return;
     }
     setLoadingInventories(true);
-    const unsub = subscribeToUserInventories(user.uid, (books) => {
-      setInventories(books);
+
+    // Timeout: if Firestore hasn't responded in 12 s (common on flaky mobile
+    // networks), stop blocking the UI. The user will see an empty inventory
+    // list rather than a spinner forever.
+    const timeout = setTimeout(() => {
+      console.warn("[InventoryContext] Firestore timed out — showing empty state");
       setLoadingInventories(false);
+    }, 12_000);
 
-      // Auto-select if only one inventory and none selected yet
-      if (books.length === 1 && !currentInventoryId) {
-        setCurrentInventoryId(books[0].id);
-        localStorage.setItem(LS_KEY, books[0].id);
-      }
+    let unsub: (() => void) | undefined;
+    try {
+      unsub = subscribeToUserInventories(user.uid, (books) => {
+        clearTimeout(timeout);
+        setInventories(books);
+        setLoadingInventories(false);
 
-      // If persisted ID no longer valid (removed from inventory), clear it
-      if (currentInventoryId && books.length > 0 && !books.find((b) => b.id === currentInventoryId)) {
-        setCurrentInventoryId(null);
-        localStorage.removeItem(LS_KEY);
-      }
-    });
-    return unsub;
+        // Auto-select if only one inventory and none selected yet
+        if (books.length === 1 && !currentInventoryId) {
+          setCurrentInventoryId(books[0].id);
+          localStorage.setItem(LS_KEY, books[0].id);
+        }
+
+        // If persisted ID no longer valid (removed from inventory), clear it
+        if (currentInventoryId && books.length > 0 && !books.find((b) => b.id === currentInventoryId)) {
+          setCurrentInventoryId(null);
+          localStorage.removeItem(LS_KEY);
+        }
+      });
+    } catch (err) {
+      // Firestore failed to start the subscription (e.g. bad init, rules issue)
+      console.error("[InventoryContext] subscribeToUserInventories threw:", err);
+      clearTimeout(timeout);
+      setLoadingInventories(false);
+    }
+
+    return () => {
+      clearTimeout(timeout);
+      unsub?.();
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid, authLoading]);
 

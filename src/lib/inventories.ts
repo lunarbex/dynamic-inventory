@@ -89,14 +89,20 @@ export function subscribeToUserInventories(
     collection(db, INVENTORIES),
     where("memberIds", "array-contains", userId)
   );
-  return onSnapshot(q, (snap) => {
-    // Skip empty results that came from cache — on iOS/mobile, IndexedDB is often
-    // cleared between sessions, so the first snapshot is empty-from-cache while
-    // real server data is still in flight. Without this guard the app flashes
-    // InventorySelector before inventories arrive from the server.
-    if (snap.empty && snap.metadata.fromCache) return;
-    callback(snap.docs.map((d) => inventoryFromFirestore(d.id, d.data() as Record<string, unknown>)));
-  });
+  return onSnapshot(
+    q,
+    (snap) => {
+      // Skip empty results that came from cache — on iOS/mobile, IndexedDB is often
+      // cleared between sessions, so the first snapshot is empty-from-cache while
+      // real server data is still in flight. Without this guard the app flashes
+      // InventorySelector before inventories arrive from the server.
+      if (snap.empty && snap.metadata.fromCache) return;
+      callback(snap.docs.map((d) => inventoryFromFirestore(d.id, d.data() as Record<string, unknown>)));
+    },
+    (err) => {
+      console.error("[inventories] onSnapshot error:", err.code, err.message);
+    }
+  );
 }
 
 export async function getInventory(id: string): Promise<InventoryBook | null> {

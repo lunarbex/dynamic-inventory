@@ -23,39 +23,43 @@ const app = isNew ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
 
-function initDb() {
-  if (!isNew) return getFirestore(app);
+// Choose Firestore cache settings by probing the environment BEFORE calling
+// initializeFirestore. This avoids the double-init problem (initializeFirestore
+// can only be called once per app; a second call always throws).
+//
+// - persistentLocalCache + persistentSingleTabManager: works on all browsers
+//   that support IndexedDB, including iOS Safari 15+ and Android Chrome.
+//   Single-tab is used instead of multi-tab because multi-tab relies on
+//   BroadcastChannel, which can fail under storage pressure or private mode.
+//
+// - memoryLocalCache: fallback for private browsing and very old browsers
+//   where indexedDB is unavailable. Data still loads from the server on each
+//   visit; it just isn't cached offline.
+//
+// NOTE: experimentalForceLongPolling is intentionally NOT set here. It is
+// incompatible with persistentLocalCache in Firebase SDK v10+ and will throw
+// on initialization. The ERR_QUIC_PROTOCOL_ERROR you see in the console is a
+// transient probe failure — the Firebase SDK automatically falls back to TCP
+// without any help from us.
+function buildFirestoreSettings() {
+  const hasIndexedDB =
+    typeof window !== "undefined" && typeof indexedDB !== "undefined";
 
-  // experimentalForceLongPolling bypasses gRPC-Web / QUIC which is blocked on
-  // many mobile cellular networks (ERR_QUIC_PROTOCOL_ERROR). Long-polling uses
-  // plain HTTP/1.1 which works everywhere.
-  //
-  // persistentSingleTabManager is used instead of persistentMultipleTabManager
-  // because multi-tab syncing relies on BroadcastChannel / SharedWorker which
-  // can fail in iOS Safari private mode or under storage pressure.
-  try {
-    return initializeFirestore(app, {
+  if (hasIndexedDB) {
+    return {
       localCache: persistentLocalCache({
-        tabManager: persistentSingleTabManager({ forceOwnership: true }),
+        tabManager: persistentSingleTabManager({}),
       }),
-      experimentalForceLongPolling: true,
-    });
-  } catch (err) {
-    // Persistence unavailable (private browsing, storage quota exceeded, etc.)
-    // Fall back to in-memory cache — data still loads from server, just not cached.
-    console.warn("[Firebase] Persistence failed, falling back to memory cache:", err);
-    try {
-      return initializeFirestore(app, {
-        localCache: memoryLocalCache(),
-        experimentalForceLongPolling: true,
-      });
-    } catch (err2) {
-      console.warn("[Firebase] Memory cache also failed, using default Firestore:", err2);
-      return getFirestore(app);
-    }
+    };
   }
+
+  console.warn("[Firebase] IndexedDB unavailable — using in-memory cache");
+  return { localCache: memoryLocalCache() };
 }
 
-export const db = initDb();
+export const db = isNew
+  ? initializeFirestore(app, buildFirestoreSettings())
+  : getFirestore(app);
+
 export const storage = getStorage(app);
 export default app;
