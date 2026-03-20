@@ -338,7 +338,9 @@ export function PhotoCapture({ photos, previewUrls, onAddPhotos, onRemove }: Pho
 
       {/* ── Camera modal ──────────────────────────────────────────────────── */}
       {cameraState !== "closed" && (
-        <div className="fixed inset-0 z-50 bg-black flex flex-col">
+        <div className="fixed inset-0 z-50 bg-black flex flex-col"
+          style={{ height: "100dvh" }}
+        >
 
           {/* Close */}
           <button
@@ -443,7 +445,7 @@ export function PhotoCapture({ photos, previewUrls, onAddPhotos, onRemove }: Pho
                     autoPlay
                     playsInline
                     muted
-                    className="flex-1 w-full object-cover"
+                    className="flex-1 w-full object-cover min-h-0"
                     style={facingMode === "user" ? { transform: "scaleX(-1)" } : undefined}
                     onLoadedMetadata={(e) => {
                       const v = e.currentTarget;
@@ -453,8 +455,10 @@ export function PhotoCapture({ photos, previewUrls, onAddPhotos, onRemove }: Pho
                     onError={(e) => log("Video element error", e)}
                   />
 
-                  {/* Controls bar */}
-                  <div className="flex items-center justify-center gap-8 py-8 bg-black">
+                  {/* Controls bar — pb accounts for iPhone home indicator safe area */}
+                  <div className="flex items-center justify-center gap-8 pt-6 pb-6 bg-black"
+                    style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+                  >
                     {/* Flip */}
                     <button
                       onClick={flipCamera}
@@ -502,7 +506,9 @@ export function PhotoCapture({ photos, previewUrls, onAddPhotos, onRemove }: Pho
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={capturedUrl} alt="Captured" className="flex-1 w-full object-contain" />
-              <div className="flex items-center justify-center gap-4 py-8 bg-black">
+              <div className="flex items-center justify-center gap-4 pt-6 bg-black"
+                style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+              >
                 <button onClick={retake}
                   className="flex items-center gap-2 px-5 py-3 bg-stone-700 hover:bg-stone-600 text-white font-semibold rounded-2xl">
                   <RotateCcw className="w-4 h-4" /> Retake
