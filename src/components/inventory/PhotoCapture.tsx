@@ -505,7 +505,7 @@ export function PhotoCapture({ photos, previewUrls, onAddPhotos, onRemove }: Pho
           {cameraState === "preview" && capturedUrl && (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={capturedUrl} alt="Captured" className="flex-1 w-full object-contain" />
+              <img src={capturedUrl} alt="Captured" className="flex-1 min-h-0 w-full object-contain" />
               <div className="flex items-center justify-center gap-4 pt-6 bg-black"
                 style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
               >
