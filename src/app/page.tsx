@@ -286,6 +286,36 @@ export default function HomePage() {
   const [showCreateChapter, setShowCreateChapter] = useState(false);
   const [savingChapter, setSavingChapter] = useState(false);
 
+  // ── Hooks must all come before any early returns ──────────────────────────
+  const handleSaveCustomChapter = useCallback(async (chapter: CustomChapter) => {
+    if (!currentInventory) return;
+    setSavingChapter(true);
+    try {
+      const existing = currentInventory.settings?.customChapters ?? [];
+      await updateInventorySettings(currentInventory.id, {
+        ...currentInventory.settings,
+        customChapters: [...existing, chapter],
+      });
+      setShowCreateChapter(false);
+      toast.success(`"${chapter.name}" chapter created`);
+    } catch {
+      toast.error("Failed to create chapter");
+    } finally {
+      setSavingChapter(false);
+    }
+  }, [currentInventory]);
+
+  const handleDeleteCustomChapter = useCallback(async (chapterId: string) => {
+    if (!currentInventory) return;
+    const existing = currentInventory.settings?.customChapters ?? [];
+    await updateInventorySettings(currentInventory.id, {
+      ...currentInventory.settings,
+      customChapters: existing.filter((c) => c.id !== chapterId),
+    });
+    if (activeChapter === chapterId) setActiveChapter("all");
+    toast.success("Chapter removed");
+  }, [currentInventory, activeChapter]);
+
   if (!authLoading && !user) return <LoginForm />;
   if (!authLoading && !loadingInventories && !currentInventory) return <InventorySelector />;
 
@@ -331,36 +361,6 @@ export default function HomePage() {
 
   // ── All unique tags (for custom chapter creation) ─────────────────────────
   const allTags = [...new Set(items.flatMap((i) => i.tags ?? []))].sort();
-
-  // ── Save custom chapter ───────────────────────────────────────────────────
-  const handleSaveCustomChapter = useCallback(async (chapter: CustomChapter) => {
-    if (!currentInventory) return;
-    setSavingChapter(true);
-    try {
-      const existing = currentInventory.settings?.customChapters ?? [];
-      await updateInventorySettings(currentInventory.id, {
-        ...currentInventory.settings,
-        customChapters: [...existing, chapter],
-      });
-      setShowCreateChapter(false);
-      toast.success(`"${chapter.name}" chapter created`);
-    } catch {
-      toast.error("Failed to create chapter");
-    } finally {
-      setSavingChapter(false);
-    }
-  }, [currentInventory]);
-
-  const handleDeleteCustomChapter = useCallback(async (chapterId: string) => {
-    if (!currentInventory) return;
-    const existing = currentInventory.settings?.customChapters ?? [];
-    await updateInventorySettings(currentInventory.id, {
-      ...currentInventory.settings,
-      customChapters: existing.filter((c) => c.id !== chapterId),
-    });
-    if (activeChapter === chapterId) setActiveChapter("all");
-    toast.success("Chapter removed");
-  }, [currentInventory, activeChapter]);
 
   return (
     <div className="min-h-screen" style={{ background: "var(--parchment)" }}>
