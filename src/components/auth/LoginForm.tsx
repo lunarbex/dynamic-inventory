@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useAuthContext } from "./AuthProvider";
 import toast from "react-hot-toast";
 
@@ -202,6 +203,28 @@ export function LoginForm({ defaultMode = "signin" }: { defaultMode?: "signin" |
             >
               {loading ? "Please wait…" : isSignUp ? "Create account" : "Sign in"}
             </button>
+
+            {isSignUp && (
+              <p className="text-center text-xs leading-relaxed mt-1" style={{ color: "var(--ink-light)" }}>
+                By creating an account, you agree to our{" "}
+                <Link
+                  href="/terms"
+                  className="underline transition-opacity hover:opacity-75"
+                  style={{ color: "var(--ink-mid)" }}
+                >
+                  Terms of Service
+                </Link>{" "}
+                and{" "}
+                <Link
+                  href="/privacy"
+                  className="underline transition-opacity hover:opacity-75"
+                  style={{ color: "var(--ink-mid)" }}
+                >
+                  Privacy Policy
+                </Link>
+                .
+              </p>
+            )}
           </form>
         </div>
 

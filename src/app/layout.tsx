@@ -5,6 +5,7 @@ import { AuthProvider } from "@/components/auth/AuthProvider";
 import { InventoryProvider } from "@/context/InventoryContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Toaster } from "react-hot-toast";
+import { Footer } from "@/components/layout/Footer";
 
 const geist = Geist({
   variable: "--font-geist-sans",
@@ -58,6 +59,7 @@ export default function RootLayout({
                   },
                 }}
               />
+              <Footer />
             </InventoryProvider>
           </AuthProvider>
         </ErrorBoundary>
