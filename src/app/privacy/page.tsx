@@ -53,11 +53,11 @@ export default function PrivacyPage() {
               It is operated as an independent project. If you have questions about this policy,
               contact us at{" "}
               <a
-                href="mailto:privacy@invenstories.com"
+                href="mailto:hello@invenstories.app"
                 className="underline transition-opacity hover:opacity-75"
                 style={{ color: "var(--gold)" }}
               >
-                privacy@invenstories.com
+                hello@invenstories.app
               </a>
               .
             </p>
@@ -217,8 +217,8 @@ export default function PrivacyPage() {
             <ul className="space-y-2 list-none pl-0">
               {[
                 "Edit or delete any item, photo, voice recording, or story at any time from within the app.",
-                "Request a full export of your data by emailing privacy@invenstories.com.",
-                "Delete your account entirely — this permanently removes all your data from our systems. To request account deletion, email privacy@invenstories.com.",
+                "Request a full export of your data by emailing hello@invenstories.app.",
+                "Delete your account entirely — this permanently removes all your data from our systems. To request account deletion, email hello@invenstories.app.",
                 "Withdraw consent for AI processing by not using the voice recording or AI description features.",
               ].map((item, i) => (
                 <li key={i} className="flex gap-2 leading-relaxed">
@@ -229,7 +229,7 @@ export default function PrivacyPage() {
             </ul>
             <p className="mt-3 leading-relaxed">
               Depending on your location, you may have additional rights under laws such as the
-              GDPR (EU) or CCPA (California). Contact us at privacy@invenstories.com to exercise
+              GDPR (EU) or CCPA (California). Contact us at hello@invenstories.app to exercise
               any of these rights.
             </p>
           </section>
@@ -296,11 +296,11 @@ export default function PrivacyPage() {
             <p className="mt-3 font-semibold" style={{ color: "var(--ink)" }}>
               Email:{" "}
               <a
-                href="mailto:privacy@invenstories.com"
+                href="mailto:hello@invenstories.app"
                 className="font-normal underline transition-opacity hover:opacity-75"
                 style={{ color: "var(--gold)" }}
               >
-                privacy@invenstories.com
+                hello@invenstories.app
               </a>
             </p>
           </section>

@@ -274,11 +274,11 @@ export default function TermsPage() {
             <p className="leading-relaxed">
               If you have a dispute with InvenStories, please contact us first at{" "}
               <a
-                href="mailto:support@invenstories.com"
+                href="mailto:hello@invenstories.app"
                 className="underline transition-opacity hover:opacity-75"
                 style={{ color: "var(--gold)" }}
               >
-                support@invenstories.com
+                hello@invenstories.app
               </a>{" "}
               and we will do our best to resolve it informally.
             </p>
@@ -313,11 +313,11 @@ export default function TermsPage() {
             <p className="mt-3 font-semibold" style={{ color: "var(--ink)" }}>
               Email:{" "}
               <a
-                href="mailto:support@invenstories.com"
+                href="mailto:hello@invenstories.app"
                 className="font-normal underline transition-opacity hover:opacity-75"
                 style={{ color: "var(--gold)" }}
               >
-                support@invenstories.com
+                hello@invenstories.app
               </a>
             </p>
           </section>
