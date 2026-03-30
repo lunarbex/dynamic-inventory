@@ -12,10 +12,12 @@ import {
   getAgentPreferences, saveAgentPreferences,
   getPatternInsights, savePatternInsights, dismissPatternInsight,
   getCartographerInsights, saveCartographerInsights, dismissCartographerInsight,
+  getTransitionDoulaData, saveTransitionGuidance, addDecideLaterItem, removeDecideLaterItem,
 } from "@/lib/firestore";
-import type { AgentId, UserAgentPreferences, PatternInsight, PatternRecognitionResult, CartographicInsight, CartographicResult } from "@/lib/types";
+import type { AgentId, UserAgentPreferences, PatternInsight, PatternRecognitionResult, CartographicInsight, CartographicResult, TransitionInsight, TransitionDoulaData } from "@/lib/types";
 import { PatternInsightsPanel } from "@/components/agents/PatternInsightsPanel";
 import { CartographerInsightsPanel } from "@/components/agents/CartographerInsightsPanel";
+import { TransitionDoulaPanel } from "@/components/agents/TransitionDoulaPanel";
 import { ChevronDown, ChevronUp, Sparkles, Feather, Compass, Globe, LampDesk, GitBranch, Bookmark, Sprout } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -135,9 +137,38 @@ const AGENTS: AgentDef[] = [
     ],
     whenHelpful: "During moves, downsizing, estate work, major life changes, or when preparing to give things away.",
     whenToDisable: "When you're in a stable period and not actively processing belongings.",
-    status: "coming_soon",
+    status: "available",
     defaultEnabled: false,
-    settings: [],
+    settings: [
+      {
+        key: "transitionType",
+        label: "What are you navigating",
+        type: "select",
+        options: ["Death / inheritance", "Moving", "Downsizing", "Preparing my estate", "Divorce", "Other"],
+        default: "Moving",
+      },
+      {
+        key: "timelineUrgency",
+        label: "Timeline",
+        type: "select",
+        options: ["Days", "Weeks", "Months", "No rush"],
+        default: "Weeks",
+      },
+      {
+        key: "supportStyle",
+        label: "Support style",
+        type: "select",
+        options: ["Very gentle", "Balanced", "Practical focus"],
+        default: "Balanced",
+      },
+      {
+        key: "helpAvailable",
+        label: "Who's helping you",
+        type: "select",
+        options: ["Solo", "Partner", "Family", "Hired help"],
+        default: "Solo",
+      },
+    ],
   },
   {
     id: "relationship_mapper",
@@ -414,6 +445,8 @@ export default function SettingsPage() {
   const [patternRunning, setPatternRunning] = useState(false);
   const [cartResult, setCartResult] = useState<CartographicResult | null>(null);
   const [cartRunning, setCartRunning] = useState(false);
+  const [transitionData, setTransitionData] = useState<TransitionDoulaData | null>(null);
+  const [transitionRunning, setTransitionRunning] = useState(false);
 
   // Load agent prefs + existing insights
   useEffect(() => {
@@ -422,7 +455,8 @@ export default function SettingsPage() {
       getAgentPreferences(user.uid),
       getPatternInsights(user.uid),
       getCartographerInsights(user.uid),
-    ]).then(([savedPrefs, savedInsights, savedCart]) => {
+      getTransitionDoulaData(user.uid),
+    ]).then(([savedPrefs, savedInsights, savedCart, savedTransition]) => {
       const merged: UserAgentPreferences = {};
       for (const agent of AGENTS) {
         merged[agent.id] = savedPrefs[agent.id] ?? {
@@ -433,6 +467,7 @@ export default function SettingsPage() {
       setPrefs(merged);
       if (savedInsights) setPatternResult(savedInsights);
       if (savedCart) setCartResult(savedCart);
+      setTransitionData(savedTransition);
     }).finally(() => setLoading(false));
   }, [user]);
 
@@ -583,6 +618,57 @@ export default function SettingsPage() {
     await dismissCartographerInsight(user.uid, insightId);
   }
 
+  const runTransitionDoula = useCallback(async (context: "morning" | "evening" | "overwhelmed" | "refresh") => {
+    if (!user) return;
+    const config = prefs["transition_doula"]?.settings ?? {};
+    setTransitionRunning(true);
+    try {
+      const recentItems = items.slice(0, 5).map((i) => ({ name: i.name, tags: i.tags }));
+      const res = await fetch("/api/agents/transition-doula", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          config: {
+            transitionType: config.transitionType ?? "Moving",
+            timelineUrgency: config.timelineUrgency ?? "Weeks",
+            supportStyle: config.supportStyle ?? "Balanced",
+            helpAvailable: config.helpAvailable ?? "Solo",
+          },
+          itemCount: items.length,
+          recentItems,
+          decideLaterCount: transitionData?.decideLaterItems.length ?? 0,
+          context,
+        }),
+      });
+      if (!res.ok) throw new Error("Guidance failed");
+      const data = await res.json();
+      const insight: TransitionInsight = {
+        ...data.insight,
+        id: `${Date.now()}`,
+        generatedAt: new Date(),
+        context,
+      };
+      await saveTransitionGuidance(user.uid, insight);
+      setTransitionData((prev) => ({ ...(prev ?? { decideLaterItems: [], lastCheckInAt: null }), currentGuidance: insight }));
+    } catch {
+      toast.error("Couldn't reach the Doula — try again in a moment");
+    } finally {
+      setTransitionRunning(false);
+    }
+  }, [user, prefs, items, transitionData]);
+
+  async function handleAddDecideLater(name: string) {
+    if (!user) return;
+    const updated = await addDecideLaterItem(user.uid, name);
+    setTransitionData((prev) => ({ ...(prev ?? { currentGuidance: null, lastCheckInAt: null }), decideLaterItems: updated }));
+  }
+
+  async function handleRemoveDecideLater(itemId: string) {
+    if (!user) return;
+    const updated = await removeDecideLaterItem(user.uid, itemId);
+    setTransitionData((prev) => ({ ...(prev ?? { currentGuidance: null, lastCheckInAt: null }), decideLaterItems: updated }));
+  }
+
   if (authLoading || (user && loading)) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--parchment)" }}>
@@ -596,6 +682,7 @@ export default function SettingsPage() {
 
   const patternEnabled = prefs["pattern_recognition"]?.enabled ?? false;
   const cartEnabled = prefs["cartographer"]?.enabled ?? false;
+  const transitionEnabled = prefs["transition_doula"]?.enabled ?? false;
 
   return (
     <div className="min-h-screen" style={{ background: "var(--parchment)" }}>
@@ -675,6 +762,22 @@ export default function SettingsPage() {
               {agent.id === "cartographer" && !cartEnabled && (
                 <p className="text-xs italic mt-2" style={{ color: "var(--ink-light)" }}>
                   Enable the Cartographer above to map your objects' geographic journeys.
+                </p>
+              )}
+
+              {/* Transition Doula — guidance + decide-later panel */}
+              {agent.id === "transition_doula" && transitionEnabled && (
+                <TransitionDoulaPanel
+                  data={transitionData}
+                  running={transitionRunning}
+                  onRequestGuidance={runTransitionDoula}
+                  onAddDecideLater={handleAddDecideLater}
+                  onRemoveDecideLater={handleRemoveDecideLater}
+                />
+              )}
+              {agent.id === "transition_doula" && !transitionEnabled && (
+                <p className="text-xs italic mt-2" style={{ color: "var(--ink-light)" }}>
+                  Enable the Transition Doula above, then configure your situation to get started.
                 </p>
               )}
             </AgentCard>

@@ -15,7 +15,7 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { InventoryItem, UserStats, ConfirmationMode, UserAgentPreferences, PatternRecognitionResult, PatternInsight, CartographicResult, CartographicInsight, OnboardingState } from "./types";
+import type { InventoryItem, UserStats, ConfirmationMode, UserAgentPreferences, PatternRecognitionResult, PatternInsight, CartographicResult, CartographicInsight, OnboardingState, TransitionDoulaData, TransitionInsight, DecideLaterItem } from "./types";
 
 const ITEMS_COLLECTION = "inventory_items";
 const USERS_COLLECTION = "user_stats";
@@ -257,4 +257,74 @@ export async function dismissPatternInsight(uid: string, insightId: string): Pro
     i.id === insightId ? { ...i, dismissed: true } : i
   );
   await savePatternInsights(uid, { ...existing, insights: updated });
+}
+
+// ── Transition Doula ────────────────────────────────────────────────────────
+
+export async function getTransitionDoulaData(uid: string): Promise<TransitionDoulaData> {
+  const snap = await getDoc(doc(db, USER_PREFS_COLLECTION, uid));
+  const empty: TransitionDoulaData = { currentGuidance: null, decideLaterItems: [], lastCheckInAt: null };
+  if (!snap.exists()) return empty;
+  const data = snap.data().transitionDoula;
+  if (!data) return empty;
+  return {
+    currentGuidance: data.currentGuidance
+      ? {
+          ...data.currentGuidance,
+          generatedAt:
+            data.currentGuidance.generatedAt instanceof Timestamp
+              ? data.currentGuidance.generatedAt.toDate()
+              : new Date(data.currentGuidance.generatedAt),
+        }
+      : null,
+    decideLaterItems: (data.decideLaterItems ?? []).map((i: Record<string, unknown>) => ({
+      ...i,
+      addedAt:
+        i.addedAt instanceof Timestamp
+          ? (i.addedAt as Timestamp).toDate()
+          : new Date(i.addedAt as string),
+    })) as DecideLaterItem[],
+    lastCheckInAt:
+      data.lastCheckInAt instanceof Timestamp ? data.lastCheckInAt.toDate() : null,
+  };
+}
+
+export async function saveTransitionGuidance(uid: string, insight: TransitionInsight): Promise<void> {
+  await setDoc(
+    doc(db, USER_PREFS_COLLECTION, uid),
+    {
+      transitionDoula: {
+        currentGuidance: { ...insight, generatedAt: serverTimestamp() },
+        lastCheckInAt: serverTimestamp(),
+      },
+    },
+    { merge: true }
+  );
+}
+
+export async function addDecideLaterItem(uid: string, name: string): Promise<DecideLaterItem[]> {
+  const data = await getTransitionDoulaData(uid);
+  const newItem: DecideLaterItem = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    name,
+    addedAt: new Date(),
+  };
+  const updated = [...data.decideLaterItems, newItem];
+  await setDoc(
+    doc(db, USER_PREFS_COLLECTION, uid),
+    { transitionDoula: { decideLaterItems: updated } },
+    { merge: true }
+  );
+  return updated;
+}
+
+export async function removeDecideLaterItem(uid: string, itemId: string): Promise<DecideLaterItem[]> {
+  const data = await getTransitionDoulaData(uid);
+  const updated = data.decideLaterItems.filter((i) => i.id !== itemId);
+  await setDoc(
+    doc(db, USER_PREFS_COLLECTION, uid),
+    { transitionDoula: { decideLaterItems: updated } },
+    { merge: true }
+  );
+  return updated;
 }

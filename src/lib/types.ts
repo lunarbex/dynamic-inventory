@@ -185,3 +185,29 @@ export interface CartographicResult {
   lastRunAt: Date;
   inventoryId: string;
 }
+
+// ── Transition Doula agent ────────────────────────────────────────────────
+export type TransitionInsightType = "step" | "delegation" | "decision_framework" | "permission" | "rest";
+
+export interface TransitionInsight {
+  id: string;
+  type: TransitionInsightType;
+  message: string;
+  suggestedActions: string[];
+  timeEstimate: string;
+  emotionalCheck: string;
+  generatedAt: Date;
+  context: "morning" | "evening" | "overwhelmed" | "refresh";
+}
+
+export interface DecideLaterItem {
+  id: string;
+  name: string;
+  addedAt: Date;
+}
+
+export interface TransitionDoulaData {
+  currentGuidance: TransitionInsight | null;
+  decideLaterItems: DecideLaterItem[];
+  lastCheckInAt: Date | null;
+}
