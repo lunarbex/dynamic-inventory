@@ -528,7 +528,7 @@ export function AddItemFlow() {
       <div className="space-y-2">
         <button onClick={processRecording} disabled={!hasTranscript}
           className="w-full py-4 bg-amber-500 hover:bg-amber-600 disabled:bg-stone-200 disabled:text-stone-400 text-white font-semibold rounded-xl transition-colors text-base">
-          Process with Claude →
+          Continue →
         </button>
         {!recordingStopped && (
           <p className="text-center text-xs text-stone-400">Record yourself describing the object to continue</p>
