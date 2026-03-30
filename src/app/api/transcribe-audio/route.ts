@@ -1,7 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
-
-const client = new Anthropic();
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,41 +9,48 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No audio file provided" }, { status: 400 });
     }
 
-    console.log("[transcribe-audio] audio size:", audioFile.size, "type:", audioFile.type);
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey || apiKey === "your-openai-api-key-here") {
+      throw new Error("OPENAI_API_KEY is not configured");
+    }
 
-    const arrayBuffer = await audioFile.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString("base64");
+    console.log("[transcribe-audio] Whisper — size:", audioFile.size, "type:", audioFile.type);
 
-    // Determine MIME type — mobile often records audio/mp4, desktop audio/webm
-    const mimeType = (audioFile.type || "audio/webm") as
-      | "audio/mp4"
-      | "audio/mpeg"
-      | "audio/webm"
-      | "audio/wav"
-      | "audio/ogg";
+    // Map MIME type to a supported Whisper file extension.
+    // Whisper accepts: flac, m4a, mp3, mp4, mpeg, mpga, oga, ogg, wav, webm
+    const ext =
+      audioFile.type.includes("mp4") || audioFile.type.includes("m4a") ? "m4a"
+      : audioFile.type.includes("ogg") ? "ogg"
+      : audioFile.type.includes("wav") ? "wav"
+      : audioFile.type.includes("mpeg") ? "mp3"
+      : "webm";
 
-    // Claude claude-sonnet-4-6 accepts audio via the document content block
-    // Firestore rule note: no rule change needed — this is a server-only call
-    const response = await client.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1024,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      messages: [{ role: "user", content: [
-        {
-          type: "document",
-          source: { type: "base64", media_type: mimeType, data: base64 },
-        } as any, // audio via document block (Claude claude-sonnet-4-6+)
-        {
-          type: "text",
-          text: "Please transcribe this voice recording verbatim. Return only the spoken words — no commentary, no formatting, no labels. If the audio is inaudible or empty, return an empty string.",
-        },
-      ] }],
+    const whisperForm = new FormData();
+    whisperForm.append("file", audioFile, `recording.${ext}`);
+    whisperForm.append("model", "whisper-1");
+    whisperForm.append("language", "en");
+    // Prompt primes Whisper for the vocabulary it will encounter
+    whisperForm.append(
+      "prompt",
+      "Household items, family heirlooms, furniture, antiques, collectibles, personal belongings. Names of people, places, and objects."
+    );
+
+    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: whisperForm,
     });
 
-    const transcript =
-      response.content[0]?.type === "text" ? response.content[0].text.trim() : "";
+    if (!response.ok) {
+      const errBody = await response.text();
+      console.error("[transcribe-audio] Whisper error:", response.status, errBody);
+      throw new Error(`Whisper API returned ${response.status}`);
+    }
 
-    console.log("[transcribe-audio] transcript length:", transcript.length);
+    const data = await response.json();
+    const transcript = (data.text ?? "").trim();
+
+    console.log("[transcribe-audio] Whisper transcript length:", transcript.length);
     return NextResponse.json({ transcript });
   } catch (err) {
     console.error("[transcribe-audio] Error:", err);

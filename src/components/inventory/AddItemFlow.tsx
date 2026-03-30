@@ -243,8 +243,8 @@ export function AddItemFlow() {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-4">
         <Loader2 className="w-10 h-10 text-amber-500 animate-spin" />
-        <p className="text-stone-700 font-medium">Transcribing your recording…</p>
-        <p className="text-stone-400 text-sm">This usually takes 5–10 seconds</p>
+        <p className="text-stone-700 font-medium">Transcribing your story…</p>
+        <p className="text-stone-400 text-sm">This usually takes a few seconds</p>
       </div>
     );
   }
