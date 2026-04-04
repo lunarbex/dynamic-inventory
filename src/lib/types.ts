@@ -102,6 +102,10 @@ export interface InventoryItem {
   // V2 collection hierarchy — stored now, UI built later
   collectionId: string | null;  // parent collection item's ID, or null
   isCollection: boolean;        // true if this item is itself a container
+
+  // Import provenance
+  importSource?: "manual" | "bulk-photo" | "csv" | "quick-photo";
+  importBatchId?: string;
 }
 
 export interface UserStats {

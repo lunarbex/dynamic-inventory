@@ -23,7 +23,7 @@ import {
   DerivedChapter,
 } from "@/lib/chapters";
 import type { CustomChapter } from "@/lib/types";
-import { BookOpen, Plus, ArrowLeft, MapPin, X, Pencil } from "lucide-react";
+import { BookOpen, Plus, ArrowLeft, MapPin, X, Pencil, LayoutGrid, Rows3, List, Upload } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 
 const ROMAN = [
@@ -286,6 +286,22 @@ export default function HomePage() {
   const [showCreateChapter, setShowCreateChapter] = useState(false);
   const [savingChapter, setSavingChapter] = useState(false);
 
+  // View mode: default based on inventory mode
+  const defaultView = currentInventory?.mode === "professional" ? "compact" : "card";
+  const viewStorageKey = currentInventory ? `viewMode-${currentInventory.id}` : null;
+  const [viewMode, setViewMode] = useState<"card" | "compact" | "list">(() => {
+    if (viewStorageKey && typeof window !== "undefined") {
+      const saved = localStorage.getItem(viewStorageKey);
+      if (saved === "card" || saved === "compact" || saved === "list") return saved;
+    }
+    return defaultView;
+  });
+
+  function changeView(mode: "card" | "compact" | "list") {
+    setViewMode(mode);
+    if (viewStorageKey) localStorage.setItem(viewStorageKey, mode);
+  }
+
   // ── Hooks must all come before any early returns ──────────────────────────
   const handleSaveCustomChapter = useCallback(async (chapter: CustomChapter) => {
     if (!currentInventory) return;
@@ -506,7 +522,7 @@ export default function HomePage() {
           })}
         </div>
 
-        {/* ── Stats + Add + Create chapter ──────────────────────── */}
+        {/* ── Stats + controls bar ──────────────────────────────── */}
         <div className="flex items-center justify-between py-3 text-xs" style={{ color: "var(--ink-light)" }}>
           {activeChapter === "all" ? (
             <span>{isLoading ? "Loading…" : `${derivedChapters.length} chapters · ${items.length} entries`}</span>
@@ -514,6 +530,30 @@ export default function HomePage() {
             <span />
           )}
           <div className="flex items-center gap-3">
+            {/* View toggle — only in chapter detail view */}
+            {activeChapter !== "all" && (
+              <div className="flex items-center gap-0.5" style={{ border: "1px solid var(--border)", borderRadius: "6px", overflow: "hidden" }}>
+                {([
+                  { mode: "card" as const, Icon: Rows3, title: "Card view" },
+                  { mode: "compact" as const, Icon: LayoutGrid, title: "Grid view" },
+                  { mode: "list" as const, Icon: List, title: "List view" },
+                ] as const).map(({ mode, Icon, title }) => (
+                  <button
+                    key={mode}
+                    onClick={() => changeView(mode)}
+                    title={title}
+                    className="p-1.5 transition-colors"
+                    style={{
+                      background: viewMode === mode ? "var(--parchment-dark)" : "transparent",
+                      color: viewMode === mode ? "var(--gold)" : "var(--ink-light)",
+                    }}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                  </button>
+                ))}
+              </div>
+            )}
+
             {activeChapter === "all" && (
               <button
                 onClick={() => setShowCreateChapter(true)}
@@ -523,6 +563,15 @@ export default function HomePage() {
               >
                 <Pencil className="w-3 h-3" /> Custom chapter
               </button>
+            )}
+            {currentInventory?.mode === "professional" && (
+              <Link
+                href="/bulk-import"
+                className="flex items-center gap-1 transition-opacity hover:opacity-75"
+                style={{ color: "var(--ink-mid)" }}
+              >
+                <Upload className="w-3 h-3" /> Import
+              </Link>
             )}
             <Link
               href="/add"
@@ -595,9 +644,15 @@ export default function HomePage() {
         ) : (
           /* ── Item grid for single chapter ── */
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-3">
+            <div className={
+              viewMode === "compact"
+                ? "grid grid-cols-3 gap-2"
+                : viewMode === "list"
+                ? "flex flex-col gap-2"
+                : "grid grid-cols-2 gap-3"
+            }>
               {displayItems.map((item) => (
-                <ItemCard key={item.id} item={item} />
+                <ItemCard key={item.id} item={item} variant={viewMode} />
               ))}
             </div>
 

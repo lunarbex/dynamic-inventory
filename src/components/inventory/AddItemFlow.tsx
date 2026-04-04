@@ -13,10 +13,10 @@ import { addItem } from "@/lib/firestore";
 import { uploadPhotos, uploadAudio } from "@/lib/storage";
 import type { ActivityZoneId, ConfirmationMode, OriginPlace } from "@/lib/types";
 import {
-  Loader2, ChevronRight, Check, Pencil, Clock,
+  Loader2, ChevronRight, Check, Pencil, Clock, Sparkles,
 } from "lucide-react";
 
-type Step = "capture" | "transcribing" | "processing" | "review" | "saving";
+type Step = "capture" | "transcribing" | "processing" | "analyzing-photo" | "review" | "saving";
 
 interface ExtractedState {
   transcript: string;
@@ -67,6 +67,7 @@ export function AddItemFlow() {
   const [transcribeError, setTranscribeError] = useState<string | null>(null);
   const [extracted, setExtracted] = useState<ExtractedState | null>(null);
   const [editing, setEditing] = useState(false);
+  const [importSource, setImportSource] = useState<"manual" | "quick-photo">("manual");
 
   // ── Photos ────────────────────────────────────────────────────────────────
 
@@ -93,6 +94,44 @@ export function AddItemFlow() {
     setRecordingStopped(false);
     setAudioBlob(null);
     setTranscribeError(null);
+  }
+
+  // ── Quick Add: analyze photo ──────────────────────────────────────────────
+
+  async function analyzePhoto() {
+    if (photos.length === 0) { toast.error("Add a photo first."); return; }
+    setStep("analyzing-photo");
+    try {
+      const form = new FormData();
+      form.append("image", photos[0], photos[0].name);
+      const res = await fetch("/api/analyze-photo", { method: "POST", body: form });
+      if (!res.ok) throw new Error("Photo analysis failed");
+      const data = await res.json();
+      const item = data.items?.[0];
+      if (!item) throw new Error("No items detected in photo");
+
+      setImportSource("quick-photo");
+      setExtracted({
+        transcript: "",
+        name: item.name ?? "",
+        description: item.description ?? "",
+        categories: item.categories ?? [],
+        microLocation: "",
+        macroLocation: "",
+        originPlace: { name: "" },
+        story: "",
+        provenance: "",
+        passTo: "",
+        isLoanable: false,
+        condition: "",
+        tags: item.tags ?? [],
+      });
+      setStep("review");
+    } catch (err) {
+      console.error("[AddItemFlow] analyzePhoto error:", err);
+      toast.error(err instanceof Error ? err.message : "Photo analysis failed");
+      setStep("capture");
+    }
   }
 
   async function transcribeAudio(blob: Blob) {
@@ -224,6 +263,7 @@ export function AddItemFlow() {
         confirmationMode,
         collectionId: null,
         isCollection: false,
+        importSource,
       });
 
       console.log("[AddItemFlow] saved! id:", newId);
@@ -259,6 +299,16 @@ export function AddItemFlow() {
     );
   }
 
+  if (step === "analyzing-photo") {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-4">
+        <Loader2 className="w-10 h-10 text-amber-500 animate-spin" />
+        <p className="text-stone-700 font-medium">Reading photo…</p>
+        <p className="text-stone-400 text-sm">Extracting item details from the image</p>
+      </div>
+    );
+  }
+
   if (step === "saving") {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-4">
@@ -276,7 +326,11 @@ export function AddItemFlow() {
       <div className="space-y-6">
         <div>
           <h2 className="text-lg font-semibold text-stone-800">Review & Confirm</h2>
-          <p className="text-stone-500 text-sm mt-0.5">Here&apos;s what Claude extracted from your story</p>
+          <p className="text-stone-500 text-sm mt-0.5">
+            {importSource === "quick-photo"
+              ? "Here's what Claude read from your photo — add a voice story or save as-is"
+              : "Here's what Claude extracted from your story"}
+          </p>
         </div>
 
         {photoPreviewUrls.length > 0 && (
@@ -471,6 +525,22 @@ export function AddItemFlow() {
           }}
           onRemove={removePhoto}
         />
+
+        {/* Quick Add from photo */}
+        {photos.length > 0 && (
+          <div className="flex flex-col gap-2 pt-1">
+            <button
+              onClick={analyzePhoto}
+              className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold rounded-xl transition-colors border-2 border-dashed border-amber-300 hover:border-amber-400 hover:bg-amber-50 text-amber-700"
+            >
+              <Sparkles className="w-4 h-4" />
+              Quick Add — analyze photo
+            </button>
+            <p className="text-center text-xs text-stone-400">
+              Skips voice — AI reads the photo and pre-fills the form
+            </p>
+          </div>
+        )}
       </section>
 
       {/* Voice */}

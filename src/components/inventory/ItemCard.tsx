@@ -8,6 +8,7 @@ import { MapPin } from "lucide-react";
 
 interface ItemCardProps {
   item: InventoryItem;
+  variant?: "card" | "compact" | "list";
 }
 
 // Five warm, muted tag colors — deterministic per tag string
@@ -23,7 +24,7 @@ function tagStyle(tag: string) {
   return TAG_PALETTE[idx];
 }
 
-export function ItemCard({ item }: ItemCardProps) {
+export function ItemCard({ item, variant = "card" }: ItemCardProps) {
   const router = useRouter();
   const firstPhoto = item.photos[0];
   const primaryZone = ACTIVITY_ZONES.find((z) => z.id === item.categories[0]);
@@ -31,6 +32,78 @@ export function ItemCard({ item }: ItemCardProps) {
   const storyPreview = item.story || item.description;
   const tags = (item.tags ?? []).slice(0, 3);
 
+  // ── Compact (3-col thumbnail grid) ──────────────────────────────────────
+  if (variant === "compact") {
+    return (
+      <div
+        className="group cursor-pointer flex flex-col"
+        style={{ border: "1px solid var(--border)", background: "var(--parchment-light)", borderRadius: "8px", overflow: "hidden" }}
+        onClick={() => router.push(`/items/${item.id}`)}
+      >
+        <div className="relative aspect-square overflow-hidden">
+          {firstPhoto ? (
+            <Image src={firstPhoto} alt={item.name} fill className="object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-3xl" style={{ background: "var(--parchment-dark)" }}>
+              {primaryZone?.icon ?? "📦"}
+            </div>
+          )}
+        </div>
+        <div className="px-2 py-1.5">
+          <p className="font-serif text-xs font-semibold leading-snug line-clamp-2" style={{ color: "var(--ink)" }}>{item.name}</p>
+          {primaryZone && (
+            <p className="text-[9px] mt-0.5 truncate" style={{ color: "var(--ink-light)" }}>{primaryZone.icon} {primaryZone.label}</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── List (1-col horizontal row) ──────────────────────────────────────────
+  if (variant === "list") {
+    return (
+      <div
+        className="group cursor-pointer flex items-center gap-3 p-3"
+        style={{ border: "1px solid var(--border)", background: "var(--parchment-light)", borderRadius: "8px" }}
+        onClick={() => router.push(`/items/${item.id}`)}
+      >
+        <div className="relative shrink-0 overflow-hidden" style={{ width: 56, height: 56, borderRadius: "6px" }}>
+          {firstPhoto ? (
+            <Image src={firstPhoto} alt={item.name} fill className="object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-xl" style={{ background: "var(--parchment-dark)" }}>
+              {primaryZone?.icon ?? "📦"}
+            </div>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-serif font-semibold text-sm leading-snug truncate" style={{ color: "var(--ink)" }}>{item.name}</h3>
+          {storyPreview && (
+            <p className="text-xs leading-relaxed line-clamp-1 italic mt-0.5" style={{ color: "var(--ink-mid)" }}>{storyPreview}</p>
+          )}
+          <div className="flex items-center gap-1.5 mt-1">
+            {displayLocation && (
+              <p className="text-[10px] flex items-center gap-0.5 truncate" style={{ color: "var(--ink-light)" }}>
+                <MapPin className="w-2.5 h-2.5 shrink-0" />{displayLocation}
+              </p>
+            )}
+            {tags.slice(0, 2).map((tag) => {
+              const s = tagStyle(tag);
+              return (
+                <Link key={tag} href={`/search?q=${encodeURIComponent(tag)}`} onClick={(e) => e.stopPropagation()}
+                  className="text-[9px] font-medium px-1.5 py-0.5 shrink-0 transition-opacity hover:opacity-80"
+                  style={{ background: s.bg, color: s.color }}>
+                  #{tag}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Default card ─────────────────────────────────────────────────────────
   return (
     <div
       className="group cursor-pointer flex flex-col"

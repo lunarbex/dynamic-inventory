@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useAuthContext } from "@/components/auth/AuthProvider";
 import { useInventoryContext } from "@/context/InventoryContext";
 import { InvitePanel } from "@/components/inventory/InvitePanel";
-import { Search, Plus, Home, LogOut, Map, Users, ChevronDown, Sparkles, Menu, X, Share2 } from "lucide-react";
+import { Search, Plus, Home, LogOut, Map, Users, ChevronDown, Sparkles, Menu, X, Share2, Upload } from "lucide-react";
 
 export function Header() {
   const { user, logOut } = useAuthContext();
@@ -117,6 +117,13 @@ export function Header() {
               style={{ color: navColor("/settings") }}>
               <Sparkles className="w-5 h-5" />
             </Link>
+            {currentInventory?.mode === "professional" && (
+              <Link href="/bulk-import" title="Bulk import"
+                className="p-2 rounded transition-colors"
+                style={{ color: navColor("/bulk-import") }}>
+                <Upload className="w-5 h-5" />
+              </Link>
+            )}
             {currentInventory && (
               <button
                 onClick={() => setShowInvite(true)}
@@ -217,6 +224,7 @@ export function Header() {
               { href: "/", label: "Home", Icon: Home },
               { href: "/map", label: "Map", Icon: Map },
               { href: "/settings", label: "Agents", Icon: Sparkles },
+              { href: "/bulk-import", label: "Bulk Import", Icon: Upload },
             ].map(({ href, label, Icon }) => (
               <Link
                 key={href}
