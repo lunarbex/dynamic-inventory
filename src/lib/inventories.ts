@@ -13,7 +13,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { InventoryBook, InventoryMember, MemberRole } from "./types";
+import type { InventoryBook, InventoryMember, MemberRole, InventoryMode } from "./types";
 
 const INVENTORIES = "inventories";
 const INVITE_CODES = "invite_codes";
@@ -39,6 +39,7 @@ export function inventoryFromFirestore(id: string, data: Record<string, unknown>
   return {
     id,
     name: data.name as string,
+    mode: (data.mode as InventoryMode) ?? "mixed",
     createdBy: data.createdBy as string,
     createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(),
     memberIds: (data.memberIds as string[]) ?? [],
@@ -52,7 +53,8 @@ export function inventoryFromFirestore(id: string, data: Record<string, unknown>
 export async function createInventory(
   name: string,
   userId: string,
-  email: string
+  email: string,
+  mode: InventoryMode = "mixed"
 ): Promise<InventoryBook> {
   const firstMember = {
     userId,
@@ -63,6 +65,7 @@ export async function createInventory(
 
   const ref = await addDoc(collection(db, INVENTORIES), {
     name: name.trim(),
+    mode,
     createdBy: userId,
     createdAt: serverTimestamp(),
     memberIds: [userId],
@@ -73,12 +76,17 @@ export async function createInventory(
   return {
     id: ref.id,
     name: name.trim(),
+    mode,
     createdBy: userId,
     createdAt: new Date(),
     memberIds: [userId],
     members: { [userId]: { userId, email, role: "admin", joinedAt: new Date() } },
     settings: {},
   };
+}
+
+export async function updateInventoryMode(id: string, mode: InventoryMode): Promise<void> {
+  await updateDoc(doc(db, INVENTORIES, id), { mode });
 }
 
 export function subscribeToUserInventories(

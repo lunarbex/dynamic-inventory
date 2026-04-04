@@ -15,12 +15,13 @@ import {
   getTransitionDoulaData, saveTransitionGuidance, addDecideLaterItem, removeDecideLaterItem,
   getLabAssistantResult, saveLabAssistantResult, dismissLabNote,
 } from "@/lib/firestore";
-import type { AgentId, UserAgentPreferences, PatternInsight, PatternRecognitionResult, CartographicInsight, CartographicResult, TransitionInsight, TransitionDoulaData, LabNote, LabAssistantResult } from "@/lib/types";
+import type { AgentId, UserAgentPreferences, PatternInsight, PatternRecognitionResult, CartographicInsight, CartographicResult, TransitionInsight, TransitionDoulaData, LabNote, LabAssistantResult, InventoryMode } from "@/lib/types";
 import { PatternInsightsPanel } from "@/components/agents/PatternInsightsPanel";
 import { CartographerInsightsPanel } from "@/components/agents/CartographerInsightsPanel";
 import { TransitionDoulaPanel } from "@/components/agents/TransitionDoulaPanel";
 import { LabAssistantPanel } from "@/components/agents/LabAssistantPanel";
-import { ChevronDown, ChevronUp, Sparkles, Feather, Compass, Globe, LampDesk, GitBranch, Bookmark, Sprout, FlaskConical } from "lucide-react";
+import { ChevronDown, ChevronUp, Sparkles, Feather, Compass, Globe, LampDesk, GitBranch, Bookmark, Sprout, FlaskConical, BookOpen, TestTube } from "lucide-react";
+import { updateInventoryMode } from "@/lib/inventories";
 import toast from "react-hot-toast";
 
 // ── Agent definitions ──────────────────────────────────────────────────
@@ -47,7 +48,41 @@ interface AgentDef {
   defaultEnabled: boolean;
   alwaysOn?: boolean;
   settings: AgentSetting[];
+  // Mode relevance: which modes show this agent by default
+  primaryModes: InventoryMode[];
 }
+
+// ── Mode metadata ──────────────────────────────────────────────────────────
+
+const MODE_META: Record<InventoryMode, {
+  icon: string;
+  label: string;
+  tagline: string;
+  accent: string;
+  accentLight: string;
+}> = {
+  family: {
+    icon: "📖",
+    label: "Family & Memory",
+    tagline: "Story-focused agents, voice-first workflow",
+    accent: "#8b6914",
+    accentLight: "#f0e8d0",
+  },
+  professional: {
+    icon: "🔬",
+    label: "Professional & Materials",
+    tagline: "Technical agents, structured extraction",
+    accent: "#2d5f8a",
+    accentLight: "#dde6f0",
+  },
+  mixed: {
+    icon: "🎯",
+    label: "Mixed — All Features",
+    tagline: "All agents available, full flexibility",
+    accent: "#4a4a4a",
+    accentLight: "#e8e8e6",
+  },
+};
 
 const AGENTS: AgentDef[] = [
   {
@@ -69,6 +104,7 @@ const AGENTS: AgentDef[] = [
     defaultEnabled: true,
     alwaysOn: true,
     settings: [],
+    primaryModes: ["family", "mixed"],
   },
   {
     id: "pattern_recognition",
@@ -96,6 +132,7 @@ const AGENTS: AgentDef[] = [
         default: "Monthly",
       },
     ],
+    primaryModes: ["family", "professional", "mixed"],
   },
   {
     id: "cartographer",
@@ -123,6 +160,7 @@ const AGENTS: AgentDef[] = [
         default: "2",
       },
     ],
+    primaryModes: ["family", "professional", "mixed"],
   },
   {
     id: "transition_doula",
@@ -141,6 +179,7 @@ const AGENTS: AgentDef[] = [
     whenToDisable: "When you're in a stable period and not actively processing belongings.",
     status: "available",
     defaultEnabled: false,
+    primaryModes: ["family", "mixed"],
     settings: [
       {
         key: "transitionType",
@@ -189,6 +228,7 @@ const AGENTS: AgentDef[] = [
     whenToDisable: "If your inventory is primarily sentimental or narrative — items without technical specifications or comparative test data.",
     status: "available",
     defaultEnabled: false,
+    primaryModes: ["professional", "mixed"],
     settings: [
       {
         key: "workType",
@@ -224,6 +264,7 @@ const AGENTS: AgentDef[] = [
     status: "coming_soon",
     defaultEnabled: false,
     settings: [],
+    primaryModes: ["family", "mixed"],
   },
   {
     id: "memory_keeper",
@@ -243,6 +284,7 @@ const AGENTS: AgentDef[] = [
     status: "coming_soon",
     defaultEnabled: false,
     settings: [],
+    primaryModes: ["family", "mixed"],
   },
   {
     id: "organizational_coach",
@@ -262,6 +304,7 @@ const AGENTS: AgentDef[] = [
     status: "coming_soon",
     defaultEnabled: false,
     settings: [],
+    primaryModes: ["family", "professional", "mixed"],
   },
 ];
 
@@ -485,6 +528,8 @@ export default function SettingsPage() {
   const [transitionRunning, setTransitionRunning] = useState(false);
   const [labResult, setLabResult] = useState<LabAssistantResult | null>(null);
   const [labRunning, setLabRunning] = useState(false);
+  const [showAllAgents, setShowAllAgents] = useState(false);
+  const [savingMode, setSavingMode] = useState(false);
 
   // Load agent prefs + existing insights
   useEffect(() => {
@@ -784,6 +829,99 @@ export default function SettingsPage() {
   const transitionEnabled = prefs["transition_doula"]?.enabled ?? false;
   const labEnabled = prefs["lab_assistant"]?.enabled ?? false;
 
+  // Mode-aware agent ordering and filtering
+  const mode: InventoryMode = currentInventory?.mode ?? "mixed";
+  const modeMeta = MODE_META[mode];
+  const primaryAgents = AGENTS.filter((a) => a.primaryModes.includes(mode));
+  const secondaryAgents = AGENTS.filter((a) => !a.primaryModes.includes(mode));
+
+  async function handleModeChange(newMode: InventoryMode) {
+    if (!currentInventory) return;
+    setSavingMode(true);
+    try {
+      await updateInventoryMode(currentInventory.id, newMode);
+      toast.success(`Mode updated to ${MODE_META[newMode].label}`);
+    } catch {
+      toast.error("Failed to update mode");
+    } finally {
+      setSavingMode(false);
+    }
+  }
+
+  function renderAgentPanel(agent: AgentDef) {
+    return (
+      <AgentCard
+        key={agent.id}
+        agent={agent}
+        enabled={prefs[agent.id]?.enabled ?? agent.defaultEnabled}
+        agentSettings={prefs[agent.id]?.settings ?? {}}
+        onToggle={(enabled) => handleToggle(agent.id, enabled)}
+        onSettingChange={(key, value) => handleSettingChange(agent.id, key, value)}
+      >
+        {agent.id === "pattern_recognition" && patternEnabled && (
+          <PatternInsightsPanel
+            insights={patternResult?.insights ?? []}
+            lastRunAt={patternResult?.lastRunAt ?? null}
+            running={patternRunning}
+            onRunSingle={() => runPatternRecognition(false)}
+            onRunAll={() => runPatternRecognition(true)}
+            onDismiss={handleDismiss}
+          />
+        )}
+        {agent.id === "pattern_recognition" && !patternEnabled && (
+          <p className="text-xs italic mt-2" style={{ color: "var(--ink-light)" }}>
+            Enable Pattern Recognition above to run an analysis.
+          </p>
+        )}
+
+        {agent.id === "cartographer" && cartEnabled && (
+          <CartographerInsightsPanel
+            insights={cartResult?.insights ?? []}
+            lastRunAt={cartResult?.lastRunAt ?? null}
+            running={cartRunning}
+            onRunSingle={() => runCartographer(false)}
+            onRunAll={() => runCartographer(true)}
+            onDismiss={handleCartDismiss}
+          />
+        )}
+        {agent.id === "cartographer" && !cartEnabled && (
+          <p className="text-xs italic mt-2" style={{ color: "var(--ink-light)" }}>
+            Enable the Cartographer above to map your objects&apos; geographic journeys.
+          </p>
+        )}
+
+        {agent.id === "transition_doula" && transitionEnabled && (
+          <TransitionDoulaPanel
+            data={transitionData}
+            running={transitionRunning}
+            onRequestGuidance={runTransitionDoula}
+            onAddDecideLater={handleAddDecideLater}
+            onRemoveDecideLater={handleRemoveDecideLater}
+          />
+        )}
+        {agent.id === "transition_doula" && !transitionEnabled && (
+          <p className="text-xs italic mt-2" style={{ color: "var(--ink-light)" }}>
+            Enable the Transition Doula above, then configure your situation to get started.
+          </p>
+        )}
+
+        {agent.id === "lab_assistant" && labEnabled && (
+          <LabAssistantPanel
+            result={labResult}
+            running={labRunning}
+            onRun={runLabAssistant}
+            onDismiss={handleLabDismiss}
+          />
+        )}
+        {agent.id === "lab_assistant" && !labEnabled && (
+          <p className="text-xs italic mt-2" style={{ color: "var(--ink-light)" }}>
+            Enable the Lab Assistant above to extract structured notes from your material and experiment entries.
+          </p>
+        )}
+      </AgentCard>
+    );
+  }
+
   return (
     <div className="min-h-screen" style={{ background: "var(--parchment)" }}>
       <OnboardingTour run={runTour} onFinish={finishTour} />
@@ -812,7 +950,74 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {saving && (
+        {/* ── Inventory mode section ─────────────────────────────────── */}
+        {currentInventory && (
+          <div
+            className="mb-6 p-4 rounded-xl"
+            style={{ border: "1px solid var(--border)", background: "var(--parchment-light)" }}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-[9px] tracking-[0.2em] uppercase font-semibold mb-1" style={{ color: "var(--ink-light)" }}>
+                  Inventory mode
+                </p>
+                <div className="flex items-center gap-2">
+                  <span className="text-base leading-none">{modeMeta.icon}</span>
+                  <div>
+                    <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>{modeMeta.label}</p>
+                    <p className="text-xs" style={{ color: "var(--ink-mid)" }}>{modeMeta.tagline}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Mode switcher */}
+            <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
+              <p className="text-[9px] tracking-[0.2em] uppercase font-semibold mb-2" style={{ color: "var(--ink-light)" }}>
+                Change mode
+              </p>
+              <div className="flex gap-2 flex-wrap">
+                {(["family", "professional", "mixed"] as InventoryMode[]).map((m) => {
+                  const meta = MODE_META[m];
+                  const isActive = mode === m;
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => !isActive && handleModeChange(m)}
+                      disabled={savingMode || isActive}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-opacity"
+                      style={{
+                        borderRadius: "8px",
+                        border: `1px solid ${isActive ? meta.accent : "var(--border)"}`,
+                        background: isActive ? meta.accentLight : "var(--parchment)",
+                        color: isActive ? meta.accent : "var(--ink-mid)",
+                        opacity: savingMode && !isActive ? 0.5 : 1,
+                        cursor: isActive ? "default" : "pointer",
+                      }}
+                    >
+                      <span className="text-base leading-none">{meta.icon}</span>
+                      {m === "family" ? "Family & Memory" : m === "professional" ? "Professional" : "Mixed"}
+                    </button>
+                  );
+                })}
+              </div>
+              {secondaryAgents.length > 0 && mode !== "mixed" && (
+                <p className="text-[10px] mt-2 leading-relaxed" style={{ color: "var(--ink-light)" }}>
+                  {secondaryAgents.length} agent{secondaryAgents.length !== 1 ? "s" : ""} hidden in this mode.{" "}
+                  <button
+                    onClick={() => setShowAllAgents((v) => !v)}
+                    className="underline transition-opacity hover:opacity-70"
+                    style={{ color: "var(--ink-mid)" }}
+                  >
+                    {showAllAgents ? "Hide them" : "Show all agents"}
+                  </button>
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {(saving || savingMode) && (
           <div className="flex items-center justify-center gap-2 mb-4 text-xs" style={{ color: "var(--ink-light)" }}>
             <div className="w-3 h-3 border border-t-transparent rounded-full animate-spin"
               style={{ borderColor: "var(--gold)", borderTopColor: "transparent" }} />
@@ -820,84 +1025,26 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Agent cards */}
+        {/* Agent cards — primary for this mode */}
         <div className="space-y-3">
-          {AGENTS.map((agent) => (
-            <AgentCard
-              key={agent.id}
-              agent={agent}
-              enabled={prefs[agent.id]?.enabled ?? agent.defaultEnabled}
-              agentSettings={prefs[agent.id]?.settings ?? {}}
-              onToggle={(enabled) => handleToggle(agent.id, enabled)}
-              onSettingChange={(key, value) => handleSettingChange(agent.id, key, value)}
-            >
-              {/* Pattern Recognition — inline insights panel */}
-              {agent.id === "pattern_recognition" && patternEnabled && (
-                <PatternInsightsPanel
-                  insights={patternResult?.insights ?? []}
-                  lastRunAt={patternResult?.lastRunAt ?? null}
-                  running={patternRunning}
-                  onRunSingle={() => runPatternRecognition(false)}
-                  onRunAll={() => runPatternRecognition(true)}
-                  onDismiss={handleDismiss}
-                />
-              )}
-              {agent.id === "pattern_recognition" && !patternEnabled && (
-                <p className="text-xs italic mt-2" style={{ color: "var(--ink-light)" }}>
-                  Enable Pattern Recognition above to run an analysis.
-                </p>
-              )}
-
-              {/* Cartographer — inline geographic insights panel */}
-              {agent.id === "cartographer" && cartEnabled && (
-                <CartographerInsightsPanel
-                  insights={cartResult?.insights ?? []}
-                  lastRunAt={cartResult?.lastRunAt ?? null}
-                  running={cartRunning}
-                  onRunSingle={() => runCartographer(false)}
-                  onRunAll={() => runCartographer(true)}
-                  onDismiss={handleCartDismiss}
-                />
-              )}
-              {agent.id === "cartographer" && !cartEnabled && (
-                <p className="text-xs italic mt-2" style={{ color: "var(--ink-light)" }}>
-                  Enable the Cartographer above to map your objects' geographic journeys.
-                </p>
-              )}
-
-              {/* Transition Doula — guidance + decide-later panel */}
-              {agent.id === "transition_doula" && transitionEnabled && (
-                <TransitionDoulaPanel
-                  data={transitionData}
-                  running={transitionRunning}
-                  onRequestGuidance={runTransitionDoula}
-                  onAddDecideLater={handleAddDecideLater}
-                  onRemoveDecideLater={handleRemoveDecideLater}
-                />
-              )}
-              {agent.id === "transition_doula" && !transitionEnabled && (
-                <p className="text-xs italic mt-2" style={{ color: "var(--ink-light)" }}>
-                  Enable the Transition Doula above, then configure your situation to get started.
-                </p>
-              )}
-
-              {/* Lab Assistant — structured lab notes panel */}
-              {agent.id === "lab_assistant" && labEnabled && (
-                <LabAssistantPanel
-                  result={labResult}
-                  running={labRunning}
-                  onRun={runLabAssistant}
-                  onDismiss={handleLabDismiss}
-                />
-              )}
-              {agent.id === "lab_assistant" && !labEnabled && (
-                <p className="text-xs italic mt-2" style={{ color: "var(--ink-light)" }}>
-                  Enable the Lab Assistant above to extract structured notes from your material and experiment entries.
-                </p>
-              )}
-            </AgentCard>
-          ))}
+          {primaryAgents.map(renderAgentPanel)}
         </div>
+
+        {/* Secondary agents — hidden by default in non-mixed modes */}
+        {secondaryAgents.length > 0 && (mode === "mixed" || showAllAgents) && (
+          <div className="mt-6 space-y-3">
+            {mode !== "mixed" && (
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1" style={{ background: "var(--border)" }} />
+                <p className="text-[9px] tracking-[0.2em] uppercase font-semibold shrink-0" style={{ color: "var(--ink-light)" }}>
+                  Other agents
+                </p>
+                <div className="h-px flex-1" style={{ background: "var(--border)" }} />
+              </div>
+            )}
+            {secondaryAgents.map(renderAgentPanel)}
+          </div>
+        )}
 
         <p className="text-center text-xs mt-8" style={{ color: "var(--ink-light)" }}>
           More agents are in development. Each one is designed to deepen the archive, not automate it.

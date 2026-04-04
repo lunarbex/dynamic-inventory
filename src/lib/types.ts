@@ -10,9 +10,12 @@ export interface InventoryMember {
   joinedAt: Date;
 }
 
+export type InventoryMode = "family" | "professional" | "mixed";
+
 export interface InventoryBook {
   id: string;
   name: string;
+  mode: InventoryMode;
   createdBy: string;
   createdAt: Date;
   memberIds: string[];                        // for array-contains queries
