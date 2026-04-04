@@ -114,6 +114,7 @@ export type AgentId =
   | "pattern_recognition"
   | "cartographer"
   | "transition_doula"
+  | "lab_assistant"
   | "relationship_mapper"
   | "memory_keeper"
   | "organizational_coach";
@@ -210,4 +211,50 @@ export interface TransitionDoulaData {
   currentGuidance: TransitionInsight | null;
   decideLaterItems: DecideLaterItem[];
   lastCheckInAt: Date | null;
+}
+
+// ── Lab Assistant agent ───────────────────────────────────────────────────
+
+export interface LabVariables {
+  changed?: string;
+  constant?: string;
+  reason?: string;
+}
+
+export interface LabResults {
+  success?: boolean;
+  metric?: string;
+  vsExpected?: string;
+  vsPrevious?: string;
+  vsGoal?: string;
+}
+
+export interface LabNote {
+  id: string;
+  itemId: string;
+  itemName: string;
+  category?: string;
+  brand?: string;
+  batchLot?: string;
+  source?: string;
+  purchaseDate?: string;
+  cost?: number;
+  specifications: Record<string, string>;
+  testDate?: string;
+  testConditions: Record<string, string>;
+  variables: LabVariables;
+  observations: string;
+  results: LabResults;
+  analysis?: string;
+  nextSteps: string[];
+  tags: string[];
+  relatedItems: string[];
+  generatedAt: Date;
+  dismissed?: boolean;
+}
+
+export interface LabAssistantResult {
+  notes: LabNote[];
+  lastRunAt: Date;
+  inventoryId: string;
 }

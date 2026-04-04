@@ -13,12 +13,14 @@ import {
   getPatternInsights, savePatternInsights, dismissPatternInsight,
   getCartographerInsights, saveCartographerInsights, dismissCartographerInsight,
   getTransitionDoulaData, saveTransitionGuidance, addDecideLaterItem, removeDecideLaterItem,
+  getLabAssistantResult, saveLabAssistantResult, dismissLabNote,
 } from "@/lib/firestore";
-import type { AgentId, UserAgentPreferences, PatternInsight, PatternRecognitionResult, CartographicInsight, CartographicResult, TransitionInsight, TransitionDoulaData } from "@/lib/types";
+import type { AgentId, UserAgentPreferences, PatternInsight, PatternRecognitionResult, CartographicInsight, CartographicResult, TransitionInsight, TransitionDoulaData, LabNote, LabAssistantResult } from "@/lib/types";
 import { PatternInsightsPanel } from "@/components/agents/PatternInsightsPanel";
 import { CartographerInsightsPanel } from "@/components/agents/CartographerInsightsPanel";
 import { TransitionDoulaPanel } from "@/components/agents/TransitionDoulaPanel";
-import { ChevronDown, ChevronUp, Sparkles, Feather, Compass, Globe, LampDesk, GitBranch, Bookmark, Sprout } from "lucide-react";
+import { LabAssistantPanel } from "@/components/agents/LabAssistantPanel";
+import { ChevronDown, ChevronUp, Sparkles, Feather, Compass, Globe, LampDesk, GitBranch, Bookmark, Sprout, FlaskConical } from "lucide-react";
 import toast from "react-hot-toast";
 
 // ── Agent definitions ──────────────────────────────────────────────────
@@ -167,6 +169,40 @@ const AGENTS: AgentDef[] = [
         type: "select",
         options: ["Solo", "Partner", "Family", "Hired help"],
         default: "Solo",
+      },
+    ],
+  },
+  {
+    id: "lab_assistant",
+    name: "Lab Assistant",
+    archetype: "The Recorder",
+    Icon: FlaskConical,
+    palette: { bg: "#f0f4f8", iconBg: "#dde6f0", iconColor: "#2d5f8a", accent: "#2d5f8a" },
+    descriptor: "Structures detailed notes for experiments, tests, and material exploration",
+    description: "Extracts technical specifications, test conditions, variables, and results from your voice and text notes — turning rough observations into structured, comparable documentation you can build on.",
+    principles: [
+      "Precision over poetry — exact details over emotional narrative",
+      "Failure is data — document what didn't work as thoroughly as what did",
+      "Variables matter — track what changed, what stayed constant, and why",
+    ],
+    whenHelpful: "When testing materials, iterating prototypes, tracking batches, developing recipes, or comparing products. Useful for artists, makers, researchers, product developers, and food developers.",
+    whenToDisable: "If your inventory is primarily sentimental or narrative — items without technical specifications or comparative test data.",
+    status: "available",
+    defaultEnabled: false,
+    settings: [
+      {
+        key: "workType",
+        label: "Type of work",
+        type: "select",
+        options: ["Art / craft", "Product development", "Research", "Food / recipe", "Small business", "General"],
+        default: "General",
+      },
+      {
+        key: "detail",
+        label: "Extraction detail",
+        type: "select",
+        options: ["Minimal", "Standard", "Extensive"],
+        default: "Standard",
       },
     ],
   },
@@ -447,6 +483,8 @@ export default function SettingsPage() {
   const [cartRunning, setCartRunning] = useState(false);
   const [transitionData, setTransitionData] = useState<TransitionDoulaData | null>(null);
   const [transitionRunning, setTransitionRunning] = useState(false);
+  const [labResult, setLabResult] = useState<LabAssistantResult | null>(null);
+  const [labRunning, setLabRunning] = useState(false);
 
   // Load agent prefs + existing insights
   useEffect(() => {
@@ -456,7 +494,8 @@ export default function SettingsPage() {
       getPatternInsights(user.uid),
       getCartographerInsights(user.uid),
       getTransitionDoulaData(user.uid),
-    ]).then(([savedPrefs, savedInsights, savedCart, savedTransition]) => {
+      getLabAssistantResult(user.uid),
+    ]).then(([savedPrefs, savedInsights, savedCart, savedTransition, savedLab]) => {
       const merged: UserAgentPreferences = {};
       for (const agent of AGENTS) {
         merged[agent.id] = savedPrefs[agent.id] ?? {
@@ -468,6 +507,7 @@ export default function SettingsPage() {
       if (savedInsights) setPatternResult(savedInsights);
       if (savedCart) setCartResult(savedCart);
       setTransitionData(savedTransition);
+      if (savedLab) setLabResult(savedLab);
     }).finally(() => setLoading(false));
   }, [user]);
 
@@ -669,6 +709,65 @@ export default function SettingsPage() {
     setTransitionData((prev) => ({ ...(prev ?? { currentGuidance: null, lastCheckInAt: null }), decideLaterItems: updated }));
   }
 
+  const runLabAssistant = useCallback(async () => {
+    if (!currentInventory || items.length === 0) {
+      toast.error("No inventory items to analyze yet.");
+      return;
+    }
+    setLabRunning(true);
+    try {
+      const workType = prefs["lab_assistant"]?.settings?.workType ?? "General";
+      const res = await fetch("/api/agents/lab-assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items, inventoryId: currentInventory.id, workType }),
+      });
+      if (!res.ok) throw new Error("Analysis failed");
+      const data = await res.json();
+
+      const newNotes: LabNote[] = (data.notes ?? []).map((n: LabNote) => ({
+        ...n,
+        generatedAt: new Date(),
+      }));
+
+      if (newNotes.length === 0) {
+        toast("No lab-relevant items found — add items with specs, test conditions, or experimental notes.", { icon: "🔬" });
+        return;
+      }
+
+      const existing = labResult?.notes ?? [];
+      const merged = [
+        ...newNotes,
+        ...existing.filter((e) => e.dismissed),
+      ];
+
+      const result: LabAssistantResult = {
+        notes: merged,
+        lastRunAt: new Date(),
+        inventoryId: currentInventory.id,
+      };
+      setLabResult(result);
+      await saveLabAssistantResult(user!.uid, result);
+      toast.success(`${newNotes.length} lab ${newNotes.length === 1 ? "note" : "notes"} extracted`);
+    } catch {
+      toast.error("Lab analysis failed — try again later");
+    } finally {
+      setLabRunning(false);
+    }
+  }, [currentInventory, items, labResult, prefs, user]);
+
+  async function handleLabDismiss(noteId: string) {
+    if (!labResult || !user) return;
+    const updated: LabAssistantResult = {
+      ...labResult,
+      notes: labResult.notes.map((n) =>
+        n.id === noteId ? { ...n, dismissed: true } : n
+      ),
+    };
+    setLabResult(updated);
+    await dismissLabNote(user.uid, noteId);
+  }
+
   if (authLoading || (user && loading)) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--parchment)" }}>
@@ -683,6 +782,7 @@ export default function SettingsPage() {
   const patternEnabled = prefs["pattern_recognition"]?.enabled ?? false;
   const cartEnabled = prefs["cartographer"]?.enabled ?? false;
   const transitionEnabled = prefs["transition_doula"]?.enabled ?? false;
+  const labEnabled = prefs["lab_assistant"]?.enabled ?? false;
 
   return (
     <div className="min-h-screen" style={{ background: "var(--parchment)" }}>
@@ -778,6 +878,21 @@ export default function SettingsPage() {
               {agent.id === "transition_doula" && !transitionEnabled && (
                 <p className="text-xs italic mt-2" style={{ color: "var(--ink-light)" }}>
                   Enable the Transition Doula above, then configure your situation to get started.
+                </p>
+              )}
+
+              {/* Lab Assistant — structured lab notes panel */}
+              {agent.id === "lab_assistant" && labEnabled && (
+                <LabAssistantPanel
+                  result={labResult}
+                  running={labRunning}
+                  onRun={runLabAssistant}
+                  onDismiss={handleLabDismiss}
+                />
+              )}
+              {agent.id === "lab_assistant" && !labEnabled && (
+                <p className="text-xs italic mt-2" style={{ color: "var(--ink-light)" }}>
+                  Enable the Lab Assistant above to extract structured notes from your material and experiment entries.
                 </p>
               )}
             </AgentCard>

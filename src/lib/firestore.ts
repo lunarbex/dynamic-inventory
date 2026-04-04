@@ -15,7 +15,7 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { InventoryItem, UserStats, ConfirmationMode, UserAgentPreferences, PatternRecognitionResult, PatternInsight, CartographicResult, CartographicInsight, OnboardingState, TransitionDoulaData, TransitionInsight, DecideLaterItem } from "./types";
+import type { InventoryItem, UserStats, ConfirmationMode, UserAgentPreferences, PatternRecognitionResult, PatternInsight, CartographicResult, CartographicInsight, OnboardingState, TransitionDoulaData, TransitionInsight, DecideLaterItem, LabAssistantResult, LabNote } from "./types";
 
 const ITEMS_COLLECTION = "inventory_items";
 const USERS_COLLECTION = "user_stats";
@@ -327,4 +327,54 @@ export async function removeDecideLaterItem(uid: string, itemId: string): Promis
     { merge: true }
   );
   return updated;
+}
+
+// ── Lab Assistant ───────────────────────────────────────────────────────────
+
+export async function getLabAssistantResult(uid: string): Promise<LabAssistantResult | null> {
+  const snap = await getDoc(doc(db, USER_PREFS_COLLECTION, uid));
+  if (!snap.exists()) return null;
+  const data = snap.data().labAssistant;
+  if (!data) return null;
+  return {
+    notes: (data.notes ?? []).map((n: Record<string, unknown>) => ({
+      ...n,
+      generatedAt:
+        n.generatedAt instanceof Timestamp
+          ? (n.generatedAt as Timestamp).toDate()
+          : new Date(n.generatedAt as string),
+    })) as LabNote[],
+    lastRunAt:
+      data.lastRunAt instanceof Timestamp
+        ? data.lastRunAt.toDate()
+        : new Date(data.lastRunAt),
+    inventoryId: data.inventoryId,
+  };
+}
+
+export async function saveLabAssistantResult(uid: string, result: LabAssistantResult): Promise<void> {
+  await setDoc(
+    doc(db, USER_PREFS_COLLECTION, uid),
+    {
+      labAssistant: {
+        notes: result.notes.map((n) => ({ ...n, generatedAt: n.generatedAt })),
+        lastRunAt: serverTimestamp(),
+        inventoryId: result.inventoryId,
+      },
+    },
+    { merge: true }
+  );
+}
+
+export async function dismissLabNote(uid: string, noteId: string): Promise<void> {
+  const result = await getLabAssistantResult(uid);
+  if (!result) return;
+  const updated = result.notes.map((n) =>
+    n.id === noteId ? { ...n, dismissed: true } : n
+  );
+  await setDoc(
+    doc(db, USER_PREFS_COLLECTION, uid),
+    { labAssistant: { notes: updated } },
+    { merge: true }
+  );
 }
