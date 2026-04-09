@@ -303,7 +303,7 @@ export function Header() {
       )}
 
       {showAddMenu && (
-        <div className="fixed inset-0 z-40" onClick={() => setShowAddMenu(false)} />
+        <div className="fixed inset-0 z-30" onClick={() => setShowAddMenu(false)} />
       )}
 
       {showMenu && (
