@@ -15,7 +15,7 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { InventoryItem, UserStats, ConfirmationMode, UserAgentPreferences, PatternRecognitionResult, PatternInsight, CartographicResult, CartographicInsight, OnboardingState, TransitionDoulaData, TransitionInsight, DecideLaterItem, LabAssistantResult, LabNote } from "./types";
+import type { InventoryItem, ItemLabData, UserStats, ConfirmationMode, UserAgentPreferences, PatternRecognitionResult, PatternInsight, CartographicResult, CartographicInsight, OnboardingState, TransitionDoulaData, TransitionInsight, DecideLaterItem, LabAssistantResult, LabNote } from "./types";
 
 const ITEMS_COLLECTION = "inventory_items";
 const USERS_COLLECTION = "user_stats";
@@ -58,6 +58,9 @@ export function itemFromFirestore(id: string, data: Record<string, unknown>): In
     autoConfirmAfterEntry: data.autoConfirmAfterEntry as number | undefined,
     collectionId: (data.collectionId as string | null) ?? null,
     isCollection: (data.isCollection as boolean) ?? false,
+    documentationType: (data.documentationType as "story" | "lab" | undefined) ?? undefined,
+    processedBy: (data.processedBy as string | undefined) ?? undefined,
+    labData: (data.labData as ItemLabData | undefined) ?? undefined,
   };
 }
 

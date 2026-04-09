@@ -11,12 +11,13 @@ import { useAuthContext } from "@/components/auth/AuthProvider";
 import { useInventoryContext } from "@/context/InventoryContext";
 import { addItem } from "@/lib/firestore";
 import { uploadPhotos, uploadAudio } from "@/lib/storage";
-import type { ActivityZoneId, ConfirmationMode, OriginPlace } from "@/lib/types";
+import type { ActivityZoneId, ConfirmationMode, OriginPlace, ItemLabData } from "@/lib/types";
 import {
-  Loader2, ChevronRight, Check, Pencil, Clock, Sparkles,
+  Loader2, ChevronRight, Check, Pencil, Clock, Sparkles, BookOpen, FlaskConical,
 } from "lucide-react";
 
 type Step = "capture" | "transcribing" | "processing" | "analyzing-photo" | "review" | "saving";
+type DocType = "story" | "lab";
 
 interface ExtractedState {
   transcript: string;
@@ -32,6 +33,7 @@ interface ExtractedState {
   isLoanable: boolean;
   condition: string;
   tags: string[];
+  labData?: ItemLabData;
 }
 
 function emptyExtracted(): ExtractedState {
@@ -57,6 +59,9 @@ export function AddItemFlow() {
   const { currentInventory } = useInventoryContext();
   const router = useRouter();
 
+  // Default doc type based on inventory mode
+  const defaultDocType: DocType = currentInventory?.mode === "professional" ? "lab" : "story";
+
   const [step, setStep] = useState<Step>("capture");
   const [savingStatus, setSavingStatus] = useState("");
   const [photos, setPhotos] = useState<File[]>([]);
@@ -68,6 +73,7 @@ export function AddItemFlow() {
   const [extracted, setExtracted] = useState<ExtractedState | null>(null);
   const [editing, setEditing] = useState(false);
   const [importSource, setImportSource] = useState<"manual" | "quick-photo">("manual");
+  const [docType, setDocType] = useState<DocType>(defaultDocType);
 
   // ── Photos ────────────────────────────────────────────────────────────────
 
@@ -158,15 +164,13 @@ export function AddItemFlow() {
     }
   }
 
-  // ── Process ───────────────────────────────────────────────────────────────
+  // ── Process (story mode) ──────────────────────────────────────────────────
 
-  async function processRecording() {
+  async function processStoryRecording() {
     const text = transcript.trim();
     if (!text) { toast.error("Please add a description first."); return; }
 
-    console.log("[AddItemFlow] processRecording, transcript length:", text.length);
     setStep("processing");
-
     try {
       const res = await fetch("/api/process-recording", {
         method: "POST",
@@ -180,7 +184,6 @@ export function AddItemFlow() {
       }
 
       const data = await res.json();
-      console.log("[AddItemFlow] extracted:", data.extracted);
 
       setExtracted({
         transcript: text,
@@ -199,10 +202,60 @@ export function AddItemFlow() {
       });
       setStep("review");
     } catch (err) {
-      console.error("[AddItemFlow] processRecording error:", err);
+      console.error("[AddItemFlow] processStoryRecording error:", err);
       toast.error(err instanceof Error ? err.message : "Failed to process recording");
       setStep("capture");
     }
+  }
+
+  // ── Process (lab mode) ────────────────────────────────────────────────────
+
+  async function processLabRecording() {
+    const text = transcript.trim();
+    if (!text) { toast.error("Please add a description first."); return; }
+
+    setStep("processing");
+    try {
+      const res = await fetch("/api/process-lab-recording", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transcript: text }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? `API error ${res.status}`);
+      }
+
+      const data = await res.json();
+      const e = data.extracted;
+
+      setExtracted({
+        transcript: text,
+        name: e.name ?? "",
+        description: e.description ?? "",
+        categories: e.categories ?? [],
+        microLocation: e.microLocation ?? "",
+        macroLocation: e.macroLocation ?? "",
+        originPlace: e.originPlace ?? { name: "" },
+        story: "",
+        provenance: "",
+        passTo: "",
+        isLoanable: false,
+        condition: "",
+        tags: e.tags ?? [],
+        labData: e.labData,
+      });
+      setStep("review");
+    } catch (err) {
+      console.error("[AddItemFlow] processLabRecording error:", err);
+      toast.error(err instanceof Error ? err.message : "Failed to process recording");
+      setStep("capture");
+    }
+  }
+
+  function processRecording() {
+    return docType === "lab" ? processLabRecording() : processStoryRecording();
   }
 
   // ── Save ─────────────────────────────────────────────────────────────────
@@ -215,15 +268,11 @@ export function AddItemFlow() {
     }
     setStep("saving");
 
-    console.log("[AddItemFlow] save() — user:", user.uid);
-
     try {
       let photoUrls: string[] = [];
       if (photos.length > 0) {
-        console.log("[AddItemFlow] uploading", photos.length, "photos...");
         setSavingStatus("Uploading photos...");
         photoUrls = await uploadPhotos(photos, user.uid);
-        console.log("[AddItemFlow] photos uploaded:", photoUrls.length);
       }
 
       let audioUrl: string | undefined;
@@ -231,14 +280,12 @@ export function AddItemFlow() {
         setSavingStatus("Saving voice recording...");
         try {
           audioUrl = await uploadAudio(audioBlob, user.uid);
-          console.log("[AddItemFlow] audio uploaded:", audioUrl.slice(0, 80) + "...");
         } catch (err) {
           console.warn("[AddItemFlow] audio upload failed (non-fatal):", err);
         }
       }
 
       setSavingStatus("Saving to database...");
-      console.log("[AddItemFlow] writing to Firestore...");
 
       const newId = await addItem({
         inventoryId: currentInventory.id,
@@ -264,6 +311,9 @@ export function AddItemFlow() {
         collectionId: null,
         isCollection: false,
         importSource,
+        documentationType: docType,
+        processedBy: docType === "lab" ? "lab_assistant" : "story_listener",
+        labData: docType === "lab" ? extracted.labData : undefined,
       });
 
       console.log("[AddItemFlow] saved! id:", newId);
@@ -283,7 +333,7 @@ export function AddItemFlow() {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-4">
         <Loader2 className="w-10 h-10 text-amber-500 animate-spin" />
-        <p className="text-stone-700 font-medium">Transcribing your story…</p>
+        <p className="text-stone-700 font-medium">Transcribing your recording…</p>
         <p className="text-stone-400 text-sm">This usually takes a few seconds</p>
       </div>
     );
@@ -293,8 +343,12 @@ export function AddItemFlow() {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-4">
         <Loader2 className="w-10 h-10 text-amber-500 animate-spin" />
-        <p className="text-stone-700 font-medium">Claude is reading your story...</p>
-        <p className="text-stone-400 text-sm">Extracting details, location, and provenance</p>
+        <p className="text-stone-700 font-medium">
+          {docType === "lab" ? "Lab Assistant is reading your notes…" : "Claude is reading your story..."}
+        </p>
+        <p className="text-stone-400 text-sm">
+          {docType === "lab" ? "Extracting specs, conditions, and results" : "Extracting details, location, and provenance"}
+        </p>
       </div>
     );
   }
@@ -325,10 +379,18 @@ export function AddItemFlow() {
     return (
       <div className="space-y-6">
         <div>
+          <div className="flex items-center gap-2 mb-1">
+            {docType === "lab"
+              ? <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">🔬 Lab Notes</span>
+              : <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">📖 Story</span>
+            }
+          </div>
           <h2 className="text-lg font-semibold text-stone-800">Review & Confirm</h2>
           <p className="text-stone-500 text-sm mt-0.5">
             {importSource === "quick-photo"
               ? "Here's what Claude read from your photo — add a voice story or save as-is"
+              : docType === "lab"
+              ? "Here's what Lab Assistant extracted from your recording"
               : "Here's what Claude extracted from your story"}
           </p>
         </div>
@@ -350,77 +412,63 @@ export function AddItemFlow() {
           <Field label="Description" value={extracted.description} editing={editing} multiline
             onChange={(v) => setExtracted((p) => p && ({ ...p, description: v }))} />
 
-          {/* Location section */}
+          {/* Location */}
           <div className="space-y-3 pt-1 border-t border-amber-200">
             <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider">Locations</p>
             <Field label="Storage spot (micro)" value={extracted.microLocation} editing={editing}
-              placeholder="e.g. kitchen drawer 2, closet top shelf"
+              placeholder="e.g. studio shelf 2, drawer B"
               onChange={(v) => setExtracted((p) => p && ({ ...p, microLocation: v }))} />
             <Field label="City / region (macro)" value={extracted.macroLocation} editing={editing}
               placeholder="e.g. San Francisco, CA"
               onChange={(v) => setExtracted((p) => p && ({ ...p, macroLocation: v }))} />
-            <div>
-              <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-1">Origin place</p>
-              {editing ? (
-                <input type="text" value={extracted.originPlace.name}
-                  onChange={(e) => setExtracted((p) => p && ({ ...p, originPlace: { ...p.originPlace, name: e.target.value } }))}
-                  placeholder="e.g. Portland, OR or market in Oaxaca"
-                  className="w-full text-sm text-stone-800 bg-white border border-amber-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400" />
-              ) : (
+          </div>
+
+          {docType === "lab" ? (
+            /* ── Lab-specific fields ── */
+            <LabReviewFields
+              labData={extracted.labData}
+              editing={editing}
+              onChange={(ld) => setExtracted((p) => p && ({ ...p, labData: ld }))}
+            />
+          ) : (
+            /* ── Story-specific fields ── */
+            <>
+              <div className="space-y-3 pt-1 border-t border-amber-200">
+                <Field label="Story" value={extracted.story} editing={editing} multiline
+                  onChange={(v) => setExtracted((p) => p && ({ ...p, story: v }))} />
+                <Field label="Provenance" value={extracted.provenance} editing={editing} multiline
+                  onChange={(v) => setExtracted((p) => p && ({ ...p, provenance: v }))} />
+              </div>
+
+              <div className="space-y-3 pt-1 border-t border-amber-200">
+                <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider">Object life</p>
+                <Field label="Condition" value={extracted.condition} editing={editing}
+                  placeholder="e.g. excellent, well-worn, needs repair"
+                  onChange={(v) => setExtracted((p) => p && ({ ...p, condition: v }))} />
+                <Field label="Pass to" value={extracted.passTo} editing={editing}
+                  placeholder="Who might inherit or receive this?"
+                  onChange={(v) => setExtracted((p) => p && ({ ...p, passTo: v }))} />
                 <div>
-                  <p className="text-sm text-stone-800">
-                    {extracted.originPlace.name || <span className="text-stone-400 italic">Not detected</span>}
-                  </p>
-                  {extracted.originPlace.lat && (
-                    <p className="text-xs text-stone-400 mt-0.5">
-                      📍 {extracted.originPlace.lat.toFixed(4)}, {extracted.originPlace.lng?.toFixed(4)} (geocoded)
+                  <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-2">Loanable / shareable</p>
+                  {editing ? (
+                    <button type="button"
+                      onClick={() => setExtracted((p) => p && ({ ...p, isLoanable: !p.isLoanable }))}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                        extracted.isLoanable ? "bg-emerald-100 text-emerald-700" : "bg-stone-100 text-stone-500"
+                      }`}>
+                      {extracted.isLoanable ? "✓ Friends can borrow" : "Not available to borrow"}
+                    </button>
+                  ) : (
+                    <p className="text-sm text-stone-800">
+                      {extracted.isLoanable ? "✓ Friends can borrow this" : "Not available to borrow"}
                     </p>
                   )}
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
+            </>
+          )}
 
-          {/* Story & provenance */}
-          <div className="space-y-3 pt-1 border-t border-amber-200">
-            <Field label="Story" value={extracted.story} editing={editing} multiline
-              onChange={(v) => setExtracted((p) => p && ({ ...p, story: v }))} />
-            <Field label="Provenance" value={extracted.provenance} editing={editing} multiline
-              onChange={(v) => setExtracted((p) => p && ({ ...p, provenance: v }))} />
-          </div>
-
-          {/* Social fields */}
-          <div className="space-y-3 pt-1 border-t border-amber-200">
-            <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider">Object life</p>
-            <Field label="Condition" value={extracted.condition} editing={editing}
-              placeholder="e.g. excellent, well-worn, needs repair"
-              onChange={(v) => setExtracted((p) => p && ({ ...p, condition: v }))} />
-            <Field label="Pass to" value={extracted.passTo} editing={editing}
-              placeholder="Who might inherit or receive this?"
-              onChange={(v) => setExtracted((p) => p && ({ ...p, passTo: v }))} />
-            <div>
-              <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-2">Loanable / shareable</p>
-              {editing ? (
-                <button
-                  type="button"
-                  onClick={() => setExtracted((p) => p && ({ ...p, isLoanable: !p.isLoanable }))}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    extracted.isLoanable
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-stone-100 text-stone-500"
-                  }`}
-                >
-                  {extracted.isLoanable ? "✓ Friends can borrow" : "Not available to borrow"}
-                </button>
-              ) : (
-                <p className="text-sm text-stone-800">
-                  {extracted.isLoanable ? "✓ Friends can borrow this" : "Not available to borrow"}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Activity / Type */}
+          {/* Categories */}
           <div className="pt-1 border-t border-amber-200">
             <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-2">Activity / Type</p>
             {editing ? (
@@ -438,7 +486,6 @@ export function AddItemFlow() {
           {/* Tags */}
           <div className="pt-1 border-t border-amber-200">
             <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-1">Tags</p>
-            <p className="text-xs text-stone-400 mb-2">Suggested by Claude — add, remove, or keep as-is</p>
             <TagInput
               tags={extracted.tags}
               onChange={(tags) => setExtracted((p) => p && ({ ...p, tags }))}
@@ -446,12 +493,13 @@ export function AddItemFlow() {
           </div>
         </div>
 
-        <details className="text-sm">
-          <summary className="text-stone-400 cursor-pointer select-none hover:text-stone-600">View original transcript</summary>
-          <p className="mt-2 text-stone-500 italic leading-relaxed pl-2 border-l-2 border-stone-200">{extracted.transcript}</p>
-        </details>
+        {extracted.transcript && (
+          <details className="text-sm">
+            <summary className="text-stone-400 cursor-pointer select-none hover:text-stone-600">View original transcript</summary>
+            <p className="mt-2 text-stone-500 italic leading-relaxed pl-2 border-l-2 border-stone-200">{extracted.transcript}</p>
+          </details>
+        )}
 
-        {/* Three confirmation options */}
         <div className="space-y-2">
           <button onClick={() => save("auto")}
             className="w-full flex items-center justify-between px-5 py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl transition-colors group">
@@ -509,9 +557,46 @@ export function AddItemFlow() {
       <div>
         <h2 className="text-lg font-semibold text-stone-800">Add an Object</h2>
         <p className="text-stone-500 text-sm mt-0.5">
-          Pick up the object, photograph it, then tell its story
+          Pick up the object, photograph it, then describe it
         </p>
       </div>
+
+      {/* ── Documentation style ── */}
+      <section className="space-y-2">
+        <h3 className="text-sm font-medium text-stone-500 uppercase tracking-wider">Documentation style</h3>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setDocType("story")}
+            className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border-2 text-left transition-colors ${
+              docType === "story"
+                ? "border-amber-400 bg-amber-50 text-amber-800"
+                : "border-stone-200 bg-white text-stone-500 hover:border-stone-300"
+            }`}
+          >
+            <BookOpen className={`w-4 h-4 shrink-0 ${docType === "story" ? "text-amber-500" : "text-stone-400"}`} />
+            <div>
+              <p className="text-sm font-semibold leading-tight">Story</p>
+              <p className="text-xs opacity-70 leading-tight mt-0.5">Preserve narrative</p>
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => setDocType("lab")}
+            className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border-2 text-left transition-colors ${
+              docType === "lab"
+                ? "border-blue-400 bg-blue-50 text-blue-800"
+                : "border-stone-200 bg-white text-stone-500 hover:border-stone-300"
+            }`}
+          >
+            <FlaskConical className={`w-4 h-4 shrink-0 ${docType === "lab" ? "text-blue-500" : "text-stone-400"}`} />
+            <div>
+              <p className="text-sm font-semibold leading-tight">Lab Notes</p>
+              <p className="text-xs opacity-70 leading-tight mt-0.5">Technical details</p>
+            </div>
+          </button>
+        </div>
+      </section>
 
       {/* Photos */}
       <section className="space-y-3">
@@ -526,7 +611,6 @@ export function AddItemFlow() {
           onRemove={removePhoto}
         />
 
-        {/* Quick Add from photo */}
         {photos.length > 0 && (
           <div className="flex flex-col gap-2 pt-1">
             <button
@@ -543,11 +627,15 @@ export function AddItemFlow() {
         )}
       </section>
 
-      {/* Voice */}
+      {/* Voice / Text */}
       <section className="space-y-3">
-        <h3 className="text-sm font-medium text-stone-500 uppercase tracking-wider">Tell the Story</h3>
+        <h3 className="text-sm font-medium text-stone-500 uppercase tracking-wider">
+          {docType === "lab" ? "Describe your test or material" : "Tell the Story"}
+        </h3>
         <p className="text-xs text-stone-400">
-          Speak naturally — what it is, where it&apos;s from, where you keep it, who might inherit it, whether friends can borrow it
+          {docType === "lab"
+            ? "Describe what you tested, how, what happened, and what you observed. Be specific — brand, batch, conditions, results."
+            : "Speak naturally — what it is, where it's from, where you keep it, who might inherit it, whether friends can borrow it"}
         </p>
         <VoiceRecorder
           onTranscriptChange={handleTranscriptChange}
@@ -558,14 +646,12 @@ export function AddItemFlow() {
 
         {recordingStopped && (
           <div className="space-y-2 mt-2">
-            {/* Transcription error — offer server transcription */}
             {transcribeError && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800">
                 {transcribeError}
               </div>
             )}
 
-            {/* If no transcript yet and audio exists, offer server transcription */}
             {!hasTranscript && !transcribeError && audioBlob && (
               <div className="bg-stone-50 border border-stone-200 rounded-xl p-3 flex items-center justify-between gap-3">
                 <p className="text-sm text-stone-500">
@@ -587,7 +673,11 @@ export function AddItemFlow() {
               {hasTranscript && <span className="text-xs text-emerald-600 font-medium">✓ Ready</span>}
             </div>
             <textarea value={transcript} onChange={(e) => setTranscript(e.target.value)}
-              placeholder="Describe the object: what it is, where it's from, where you keep it, its story, who might inherit it..."
+              placeholder={
+                docType === "lab"
+                  ? "Describe the material or test: what you used, how you tested it, what conditions, what happened..."
+                  : "Describe the object: what it is, where it's from, where you keep it, its story, who might inherit it..."
+              }
               rows={5}
               className="w-full text-sm bg-white border border-stone-200 rounded-xl px-3 py-2.5 text-stone-800 placeholder-stone-300 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none" />
           </div>
@@ -605,6 +695,217 @@ export function AddItemFlow() {
         )}
         {recordingStopped && !hasTranscript && (
           <p className="text-center text-xs text-stone-400">Type a description above to continue</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Lab review fields ─────────────────────────────────────────────────────────
+
+function LabReviewFields({
+  labData, editing, onChange,
+}: {
+  labData?: ItemLabData;
+  editing: boolean;
+  onChange: (ld: ItemLabData) => void;
+}) {
+  const ld = labData ?? {
+    specifications: {}, testConditions: {}, observations: "", results: {}, nextSteps: [],
+  };
+
+  function update(partial: Partial<ItemLabData>) {
+    onChange({ ...ld, ...partial });
+  }
+
+  // Convert Record<string,string> to "key: value\n..." for textarea
+  function kv2text(kv: Record<string, string>) {
+    return Object.entries(kv).map(([k, v]) => `${k}: ${v}`).join("\n");
+  }
+  function text2kv(text: string): Record<string, string> {
+    const result: Record<string, string> = {};
+    for (const line of text.split("\n")) {
+      const idx = line.indexOf(":");
+      if (idx > 0) {
+        result[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+      }
+    }
+    return result;
+  }
+
+  return (
+    <div className="space-y-4 pt-1 border-t border-amber-200">
+      <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider">Lab Documentation</p>
+
+      {/* Brand + Batch */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-1">Brand</p>
+          {editing ? (
+            <input type="text" value={ld.brand ?? ""} onChange={(e) => update({ brand: e.target.value })}
+              placeholder="e.g. Winsor & Newton"
+              className="w-full text-sm text-stone-800 bg-white border border-amber-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400 placeholder-stone-300" />
+          ) : (
+            <p className="text-sm text-stone-800">{ld.brand || <span className="text-stone-400 italic">–</span>}</p>
+          )}
+        </div>
+        <div>
+          <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-1">Batch / Lot</p>
+          {editing ? (
+            <input type="text" value={ld.batchLot ?? ""} onChange={(e) => update({ batchLot: e.target.value })}
+              placeholder="e.g. B24-1103"
+              className="w-full text-sm text-stone-800 bg-white border border-amber-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400 placeholder-stone-300" />
+          ) : (
+            <p className="text-sm text-stone-800">{ld.batchLot || <span className="text-stone-400 italic">–</span>}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Specifications */}
+      <div>
+        <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-1">Specifications</p>
+        {editing ? (
+          <>
+            <textarea
+              value={kv2text(ld.specifications)}
+              onChange={(e) => update({ specifications: text2kv(e.target.value) })}
+              placeholder={"viscosity: medium\nopacity: transparent\npigment load: high"}
+              rows={3}
+              className="w-full text-sm text-stone-800 bg-white border border-amber-300 rounded-lg px-3 py-2 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none placeholder-stone-300" />
+            <p className="text-[10px] text-stone-400 mt-0.5">One "key: value" per line</p>
+          </>
+        ) : (
+          <div className="space-y-0.5">
+            {Object.entries(ld.specifications).length > 0
+              ? Object.entries(ld.specifications).map(([k, v]) => (
+                  <div key={k} className="flex gap-2 text-sm">
+                    <span className="text-stone-400 shrink-0 w-28">{k}</span>
+                    <span className="text-stone-800">{v}</span>
+                  </div>
+                ))
+              : <span className="text-stone-400 italic text-sm">None extracted</span>
+            }
+          </div>
+        )}
+      </div>
+
+      {/* Test conditions */}
+      <div>
+        <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-1">Test Conditions</p>
+        {editing ? (
+          <>
+            <textarea
+              value={kv2text(ld.testConditions)}
+              onChange={(e) => update({ testConditions: text2kv(e.target.value) })}
+              placeholder={"temperature: 22°C\nsubstrate: cold press\ndilution: 1:2 water"}
+              rows={3}
+              className="w-full text-sm text-stone-800 bg-white border border-amber-300 rounded-lg px-3 py-2 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none placeholder-stone-300" />
+            <p className="text-[10px] text-stone-400 mt-0.5">One "key: value" per line</p>
+          </>
+        ) : (
+          <div className="space-y-0.5">
+            {Object.entries(ld.testConditions).length > 0
+              ? Object.entries(ld.testConditions).map(([k, v]) => (
+                  <div key={k} className="flex gap-2 text-sm">
+                    <span className="text-stone-400 shrink-0 w-28">{k}</span>
+                    <span className="text-stone-800">{v}</span>
+                  </div>
+                ))
+              : <span className="text-stone-400 italic text-sm">None extracted</span>
+            }
+          </div>
+        )}
+      </div>
+
+      {/* Observations */}
+      <div>
+        <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-1">Observations</p>
+        {editing ? (
+          <textarea value={ld.observations} onChange={(e) => update({ observations: e.target.value })}
+            rows={3} placeholder="What happened objectively during the test"
+            className="w-full text-sm text-stone-800 bg-white border border-amber-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none placeholder-stone-300" />
+        ) : (
+          <p className="text-sm text-stone-800 leading-relaxed">
+            {ld.observations || <span className="text-stone-400 italic">None extracted</span>}
+          </p>
+        )}
+      </div>
+
+      {/* Results */}
+      <div>
+        <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-1">Results</p>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            {editing ? (
+              <>
+                <button type="button" onClick={() => update({ results: { ...ld.results, success: true } })}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors ${ld.results?.success === true ? "bg-emerald-100 text-emerald-700" : "bg-stone-100 text-stone-400"}`}>
+                  ✓ Pass
+                </button>
+                <button type="button" onClick={() => update({ results: { ...ld.results, success: false } })}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors ${ld.results?.success === false ? "bg-red-100 text-red-700" : "bg-stone-100 text-stone-400"}`}>
+                  ✗ Fail
+                </button>
+                <button type="button" onClick={() => update({ results: { ...ld.results, success: undefined } })}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors ${ld.results?.success == null ? "bg-amber-100 text-amber-700" : "bg-stone-100 text-stone-400"}`}>
+                  – TBD
+                </button>
+              </>
+            ) : (
+              ld.results?.success === true
+                ? <span className="text-xs font-semibold px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">✓ Pass</span>
+                : ld.results?.success === false
+                ? <span className="text-xs font-semibold px-2 py-0.5 bg-red-100 text-red-700 rounded-full">✗ Fail</span>
+                : <span className="text-xs font-semibold px-2 py-0.5 bg-stone-100 text-stone-400 rounded-full">– TBD</span>
+            )}
+          </div>
+          {editing ? (
+            <input type="text" value={ld.results?.metric ?? ""} placeholder="What success/failure was measured by"
+              onChange={(e) => update({ results: { ...ld.results, metric: e.target.value } })}
+              className="w-full text-sm text-stone-800 bg-white border border-amber-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400 placeholder-stone-300" />
+          ) : ld.results?.metric ? (
+            <p className="text-sm text-stone-700">{ld.results.metric}</p>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Analysis */}
+      <div>
+        <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-1">Analysis</p>
+        {editing ? (
+          <textarea value={ld.analysis ?? ""} onChange={(e) => update({ analysis: e.target.value })}
+            rows={2} placeholder="Why did this result occur?"
+            className="w-full text-sm text-stone-800 bg-white border border-amber-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none placeholder-stone-300" />
+        ) : (
+          <p className="text-sm text-stone-800 leading-relaxed">
+            {ld.analysis || <span className="text-stone-400 italic">None extracted</span>}
+          </p>
+        )}
+      </div>
+
+      {/* Next steps */}
+      <div>
+        <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-1">Next Steps</p>
+        {editing ? (
+          <>
+            <textarea
+              value={(ld.nextSteps ?? []).join("\n")}
+              onChange={(e) => update({ nextSteps: e.target.value.split("\n").filter(Boolean) })}
+              rows={3} placeholder={"Try with gesso primer\nTest batch B at higher dilution"}
+              className="w-full text-sm text-stone-800 bg-white border border-amber-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none placeholder-stone-300" />
+            <p className="text-[10px] text-stone-400 mt-0.5">One step per line</p>
+          </>
+        ) : (
+          <ul className="space-y-1">
+            {(ld.nextSteps ?? []).length > 0
+              ? ld.nextSteps!.map((s, i) => (
+                  <li key={i} className="text-sm text-stone-800 flex gap-2">
+                    <span className="text-stone-400 shrink-0">{i + 1}.</span> {s}
+                  </li>
+                ))
+              : <span className="text-stone-400 italic text-sm">None</span>
+            }
+          </ul>
         )}
       </div>
     </div>

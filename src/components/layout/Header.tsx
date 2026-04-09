@@ -117,7 +117,7 @@ export function Header() {
               style={{ color: navColor("/settings") }}>
               <Sparkles className="w-5 h-5" />
             </Link>
-            {currentInventory?.mode === "professional" && (
+            {currentInventory && (
               <Link href="/bulk-import" title="Bulk import"
                 className="p-2 rounded transition-colors"
                 style={{ color: navColor("/bulk-import") }}>

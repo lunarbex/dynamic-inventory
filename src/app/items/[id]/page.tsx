@@ -17,7 +17,7 @@ import { TagInput } from "@/components/inventory/TagInput";
 import { EditItemForm } from "@/components/inventory/EditItemForm";
 import {
   ArrowLeft, ChevronLeft, ChevronRight, Archive,
-  Navigation, Heart, Pencil, Trash2, Share2, Play, Pause,
+  Navigation, Heart, Pencil, Trash2, Share2, Play, Pause, FlaskConical, BookOpen,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -186,6 +186,17 @@ export default function ItemDetailPage() {
     }
   }
 
+  async function handleDocTypeSave(newType: "story" | "lab") {
+    if (!item) return;
+    try {
+      await updateItem(item.id, { documentationType: newType }, { uid: user!.uid, email: user!.email ?? "" });
+      setItem({ ...item, documentationType: newType });
+      toast.success(`Switched to ${newType === "lab" ? "Lab Notes" : "Story"} mode`);
+    } catch {
+      toast.error("Failed to update documentation mode");
+    }
+  }
+
   async function handleDelete() {
     if (!confirm("Delete this entry? This cannot be undone.")) return;
     setDeleting(true);
@@ -285,6 +296,31 @@ export default function ItemDetailPage() {
                 {item.description}
               </p>
             )}
+            {/* Doc type badge + switcher */}
+            <div className="flex items-center gap-2 mt-3">
+              <button
+                onClick={() => handleDocTypeSave("story")}
+                title="Switch to Story mode"
+                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium transition-all rounded-full border ${
+                  (item.documentationType ?? "story") === "story"
+                    ? "border-amber-300 bg-amber-50 text-amber-700"
+                    : "border-transparent text-stone-400 hover:border-stone-200 hover:text-stone-600"
+                }`}
+              >
+                <BookOpen className="w-3 h-3" /> Story
+              </button>
+              <button
+                onClick={() => handleDocTypeSave("lab")}
+                title="Switch to Lab Notes mode"
+                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium transition-all rounded-full border ${
+                  item.documentationType === "lab"
+                    ? "border-blue-300 bg-blue-50 text-blue-700"
+                    : "border-transparent text-stone-400 hover:border-stone-200 hover:text-stone-600"
+                }`}
+              >
+                <FlaskConical className="w-3 h-3" /> Lab Notes
+              </button>
+            </div>
           </div>
           <div className="flex items-center gap-1.5 mt-1 shrink-0">
             <button
@@ -364,6 +400,102 @@ export default function ItemDetailPage() {
               {item.name}
             </figcaption>
           </figure>
+        )}
+
+        {/* ── Lab documentation ────────────────────────────────── */}
+        {item.documentationType === "lab" && item.labData && (
+          <section className="mb-8">
+            <SectionRule label="Lab Documentation" />
+            <div className="space-y-4">
+              {/* Brand / Batch */}
+              {(item.labData.brand || item.labData.batchLot) && (
+                <div className="flex flex-wrap gap-4 text-sm font-serif" style={{ color: "var(--ink)" }}>
+                  {item.labData.brand && (
+                    <span><span style={{ color: "var(--ink-light)" }}>Brand </span>{item.labData.brand}</span>
+                  )}
+                  {item.labData.batchLot && (
+                    <span><span style={{ color: "var(--ink-light)" }}>Batch </span>{item.labData.batchLot}</span>
+                  )}
+                  {item.labData.source && (
+                    <span><span style={{ color: "var(--ink-light)" }}>Source </span>{item.labData.source}</span>
+                  )}
+                </div>
+              )}
+
+              {/* Results badge */}
+              {item.labData.results?.success != null && (
+                <div>
+                  {item.labData.results.success
+                    ? <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">✓ Pass</span>
+                    : <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-100 text-red-700">✗ Fail</span>
+                  }
+                  {item.labData.results.metric && (
+                    <span className="text-xs ml-2" style={{ color: "var(--ink-light)" }}>{item.labData.results.metric}</span>
+                  )}
+                </div>
+              )}
+
+              {/* Observations */}
+              {item.labData.observations && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--gold)" }}>Observations</p>
+                  <p className="font-serif text-base leading-7" style={{ color: "var(--ink)" }}>{item.labData.observations}</p>
+                </div>
+              )}
+
+              {/* Specifications */}
+              {Object.keys(item.labData.specifications).length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--gold)" }}>Specifications</p>
+                  <div className="space-y-1">
+                    {Object.entries(item.labData.specifications).map(([k, v]) => (
+                      <div key={k} className="flex gap-3 text-sm font-serif">
+                        <span className="w-32 shrink-0" style={{ color: "var(--ink-light)" }}>{k}</span>
+                        <span style={{ color: "var(--ink)" }}>{v}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Test conditions */}
+              {Object.keys(item.labData.testConditions).length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--gold)" }}>Test Conditions</p>
+                  <div className="space-y-1">
+                    {Object.entries(item.labData.testConditions).map(([k, v]) => (
+                      <div key={k} className="flex gap-3 text-sm font-serif">
+                        <span className="w-32 shrink-0" style={{ color: "var(--ink-light)" }}>{k}</span>
+                        <span style={{ color: "var(--ink)" }}>{v}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Analysis */}
+              {item.labData.analysis && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--gold)" }}>Analysis</p>
+                  <p className="font-serif text-sm leading-7 italic" style={{ color: "var(--ink-mid)" }}>{item.labData.analysis}</p>
+                </div>
+              )}
+
+              {/* Next steps */}
+              {(item.labData.nextSteps ?? []).length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--gold)" }}>Next Steps</p>
+                  <ol className="space-y-1">
+                    {item.labData.nextSteps!.map((s, i) => (
+                      <li key={i} className="flex gap-2 text-sm font-serif" style={{ color: "var(--ink)" }}>
+                        <span style={{ color: "var(--gold)" }}>{i + 1}.</span> {s}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+            </div>
+          </section>
         )}
 
         {/* ── Story ────────────────────────────────────────────── */}

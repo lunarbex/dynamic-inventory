@@ -530,8 +530,8 @@ export default function HomePage() {
             <span />
           )}
           <div className="flex items-center gap-3">
-            {/* View toggle — only in chapter detail view */}
-            {activeChapter !== "all" && (
+            {/* View toggle — shown whenever items exist */}
+            {items.length > 0 && (
               <div className="flex items-center gap-0.5" style={{ border: "1px solid var(--border)", borderRadius: "6px", overflow: "hidden" }}>
                 {([
                   { mode: "card" as const, Icon: Rows3, title: "Card view" },
@@ -564,7 +564,7 @@ export default function HomePage() {
                 <Pencil className="w-3 h-3" /> Custom chapter
               </button>
             )}
-            {currentInventory?.mode === "professional" && (
+            {currentInventory && (
               <Link
                 href="/bulk-import"
                 className="flex items-center gap-1 transition-opacity hover:opacity-75"

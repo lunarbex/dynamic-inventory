@@ -218,7 +218,7 @@ const AGENTS: AgentDef[] = [
     Icon: FlaskConical,
     palette: { bg: "#f0f4f8", iconBg: "#dde6f0", iconColor: "#2d5f8a", accent: "#2d5f8a" },
     descriptor: "Structures detailed notes for experiments, tests, and material exploration",
-    description: "Extracts technical specifications, test conditions, variables, and results from your voice and text notes — turning rough observations into structured, comparable documentation you can build on.",
+    description: "When enabled, Lab Notes becomes the default documentation style for new items in this inventory. You can always switch any individual item to Story or Lab mode from its add or edit page.",
     principles: [
       "Precision over poetry — exact details over emotional narrative",
       "Failure is data — document what didn't work as thoroughly as what did",
@@ -915,7 +915,7 @@ export default function SettingsPage() {
         )}
         {agent.id === "lab_assistant" && !labEnabled && (
           <p className="text-xs italic mt-2" style={{ color: "var(--ink-light)" }}>
-            Enable the Lab Assistant above to extract structured notes from your material and experiment entries.
+            Enable Lab Assistant to set Lab Notes as the default style for new items. You can still choose per-item on the add page.
           </p>
         )}
       </AgentCard>

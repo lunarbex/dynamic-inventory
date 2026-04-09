@@ -62,6 +62,18 @@ export interface CustomChapter {
   filterPassTo?: string;
 }
 
+export interface ItemLabData {
+  brand?: string;
+  batchLot?: string;
+  source?: string;
+  specifications: Record<string, string>;
+  testConditions: Record<string, string>;
+  observations: string;
+  results: LabResults;
+  analysis?: string;
+  nextSteps: string[];
+}
+
 export interface InventoryItem {
   id: string;
   inventoryId: string;
@@ -106,6 +118,11 @@ export interface InventoryItem {
   // Import provenance
   importSource?: "manual" | "bulk-photo" | "csv" | "quick-photo";
   importBatchId?: string;
+
+  // Documentation mode
+  documentationType?: "story" | "lab";
+  processedBy?: string;
+  labData?: ItemLabData;
 }
 
 export interface UserStats {

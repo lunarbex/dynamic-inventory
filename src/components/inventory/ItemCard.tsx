@@ -82,6 +82,9 @@ export function ItemCard({ item, variant = "card" }: ItemCardProps) {
             <p className="text-xs leading-relaxed line-clamp-1 italic mt-0.5" style={{ color: "var(--ink-mid)" }}>{storyPreview}</p>
           )}
           <div className="flex items-center gap-1.5 mt-1">
+            {item.documentationType === "lab" && (
+              <span title="Lab Notes" className="text-[9px] shrink-0">🔬</span>
+            )}
             {displayLocation && (
               <p className="text-[10px] flex items-center gap-0.5 truncate" style={{ color: "var(--ink-light)" }}>
                 <MapPin className="w-2.5 h-2.5 shrink-0" />{displayLocation}
@@ -180,11 +183,16 @@ export function ItemCard({ item, variant = "card" }: ItemCardProps) {
               <span className="truncate">{displayLocation}</span>
             </p>
           ) : <span />}
-          {item.addedByName && (
-            <p className="text-[10px] shrink-0" style={{ color: "var(--ink-light)" }}>
-              {item.addedByName}
-            </p>
-          )}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {item.documentationType === "lab" && (
+              <span title="Lab Notes" className="text-[9px]">🔬</span>
+            )}
+            {item.addedByName && (
+              <p className="text-[10px]" style={{ color: "var(--ink-light)" }}>
+                {item.addedByName}
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>
