@@ -115,6 +115,13 @@ export async function getItem(id: string): Promise<InventoryItem | null> {
   return itemFromFirestore(snap.id, snap.data());
 }
 
+export async function getInventoryItems(inventoryId: string): Promise<InventoryItem[]> {
+  const snap = await getDocs(
+    query(collection(db, ITEMS_COLLECTION), where("inventoryId", "==", inventoryId), orderBy("addedAt", "desc"))
+  );
+  return snap.docs.map((d) => itemFromFirestore(d.id, d.data()));
+}
+
 export async function getAllItems(): Promise<InventoryItem[]> {
   const snap = await getDocs(
     query(collection(db, ITEMS_COLLECTION), orderBy("addedAt", "desc"))

@@ -15,6 +15,7 @@ export function Header() {
   const [showInvite, setShowInvite] = useState(false);
   const [showSwitcher, setShowSwitcher] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
 
   async function shareApp() {
     const url = window.location.origin;
@@ -134,11 +135,32 @@ export function Header() {
                 <Users className="w-5 h-5" />
               </button>
             )}
-            <Link href="/add" title="Add entry" data-tour="add-button"
-              className="ml-1 px-3 py-1.5 text-xs font-semibold rounded transition-opacity hover:opacity-80 flex items-center gap-1"
-              style={{ background: "var(--gold)", color: "var(--parchment-light)" }}>
-              <Plus className="w-3.5 h-3.5" /> Add
-            </Link>
+            <div className="relative ml-1" data-tour="add-button">
+              <button
+                onClick={() => setShowAddMenu((s) => !s)}
+                className="px-3 py-1.5 text-xs font-semibold rounded transition-opacity hover:opacity-80 flex items-center gap-1"
+                style={{ background: "var(--gold)", color: "var(--parchment-light)" }}
+              >
+                <Plus className="w-3.5 h-3.5" /> Add <ChevronDown className="w-3 h-3 opacity-70" />
+              </button>
+              {showAddMenu && (
+                <div
+                  className="absolute top-full right-0 mt-1 w-44 shadow-lg overflow-hidden z-50 border pointer-events-auto"
+                  style={{ background: "var(--parchment-light)", borderColor: "var(--border)", borderRadius: "6px" }}
+                >
+                  <Link href="/add" onClick={() => setShowAddMenu(false)}
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm transition-colors"
+                    style={{ color: "var(--ink-mid)", borderBottom: "1px solid var(--border)" }}>
+                    <Plus className="w-3.5 h-3.5" /> Add single item
+                  </Link>
+                  <Link href="/bulk-import" onClick={() => setShowAddMenu(false)}
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm transition-colors"
+                    style={{ color: "var(--ink-mid)" }}>
+                    <Upload className="w-3.5 h-3.5" /> Bulk import
+                  </Link>
+                </div>
+              )}
+            </div>
             {user && (
               <button onClick={() => logOut()}
                 className="ml-1 p-2 rounded transition-colors"
@@ -156,7 +178,7 @@ export function Header() {
               style={{ color: navColor("/search") }}>
               <Search className="w-5 h-5" />
             </Link>
-            <Link href="/add" title="Add entry"
+            <Link href="/add" title="Add single item"
               className="px-3 py-1.5 text-xs font-semibold rounded transition-opacity hover:opacity-80 flex items-center gap-1"
               style={{ background: "var(--gold)", color: "var(--parchment-light)" }}>
               <Plus className="w-3.5 h-3.5" /> Add
@@ -278,6 +300,10 @@ export function Header() {
 
       {showSwitcher && !showMenu && (
         <div className="fixed inset-0 z-30" onClick={() => setShowSwitcher(false)} />
+      )}
+
+      {showAddMenu && (
+        <div className="fixed inset-0 z-40" onClick={() => setShowAddMenu(false)} />
       )}
 
       {showMenu && (

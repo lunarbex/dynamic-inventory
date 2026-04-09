@@ -6,16 +6,21 @@ import { useAuthContext } from "@/components/auth/AuthProvider";
 import { useInventoryContext } from "@/context/InventoryContext";
 import { Header } from "@/components/layout/Header";
 import { LoginForm } from "@/components/auth/LoginForm";
-import { addItem } from "@/lib/firestore";
+import { addItem, getInventoryItems } from "@/lib/firestore";
 import { uploadPhotos } from "@/lib/storage";
 import type { ActivityZoneId } from "@/lib/types";
 import {
-  Upload, X, Check, Loader2, AlertCircle, ChevronDown, ChevronUp, FileText, Image as ImageIcon,
+  Upload, X, Check, Loader2, AlertCircle, ChevronDown, ChevronUp,
+  FileText, Image as ImageIcon, Download,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { v4 as uuidv4 } from "uuid";
 
-// ── Types ─────────────────────────────────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
+const ANALYSIS_CONCURRENCY = 5;
+const MAX_PHOTOS = 500;
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface ExtractedItem {
   id: string;
@@ -26,10 +31,8 @@ interface ExtractedItem {
   visibleText: string;
   modelOrSku: string;
   tags: string[];
-  // user edits
   microLocation: string;
   macroLocation: string;
-  // state
   photoFile: File;
   photoPreviewUrl: string;
   status: "pending" | "analyzing" | "ready" | "error" | "saved";
@@ -37,7 +40,7 @@ interface ExtractedItem {
   selected: boolean;
 }
 
-// ── Simple CSV parser ─────────────────────────────────────────────────────
+// ── Simple CSV parser ──────────────────────────────────────────────────────────
 
 function parseCSV(text: string): { headers: string[]; rows: Record<string, string>[] } {
   const lines = text.trim().split(/\r?\n/);
@@ -63,10 +66,12 @@ function parseCSV(text: string): { headers: string[]; rows: Record<string, strin
   }
 
   const headers = parseLine(lines[0]);
-  const rows = lines.slice(1).map((line) => {
-    const values = parseLine(line);
-    return Object.fromEntries(headers.map((h, i) => [h, values[i] ?? ""]));
-  });
+  const rows = lines.slice(1)
+    .filter((l) => l.trim())
+    .map((line) => {
+      const values = parseLine(line);
+      return Object.fromEntries(headers.map((h, i) => [h, values[i] ?? ""]));
+    });
   return { headers, rows };
 }
 
@@ -79,6 +84,7 @@ const COLUMN_ALIASES: Record<string, string[]> = {
   tags: ["tags", "labels", "keywords", "categories"],
   brand: ["brand", "manufacturer", "maker"],
   condition: ["condition", "state", "quality"],
+  passTo: ["pass to", "inherit", "recipient", "give to"],
 };
 
 function autoMapColumn(header: string): string | null {
@@ -89,15 +95,40 @@ function autoMapColumn(header: string): string | null {
   return null;
 }
 
-// ── Photo Import Tab ──────────────────────────────────────────────────────
+// ── CSV export helper ──────────────────────────────────────────────────────────
+
+function escapeCsv(val: unknown): string {
+  const s = val == null ? "" : String(val);
+  if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+function buildCsvString(headers: string[], rows: string[][]): string {
+  return [headers, ...rows].map((r) => r.map(escapeCsv).join(",")).join("\n");
+}
+
+function downloadCsv(filename: string, content: string) {
+  const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Photo Import Tab ───────────────────────────────────────────────────────────
 
 function PhotoImportTab({
-  items, setItems, onSaveAll, saving,
+  items, setItems, onSaveAll, saving, batchName,
 }: {
   items: ExtractedItem[];
   setItems: React.Dispatch<React.SetStateAction<ExtractedItem[]>>;
   onSaveAll: () => void;
   saving: boolean;
+  batchName: string;
 }) {
   const fileInputId = useId();
   const dropRef = useRef<HTMLDivElement>(null);
@@ -106,9 +137,46 @@ function PhotoImportTab({
   const [commonTags, setCommonTags] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
 
+  const analyzeItem = useCallback(async (item: ExtractedItem, setItemsFn: React.Dispatch<React.SetStateAction<ExtractedItem[]>>) => {
+    setItemsFn((prev) => prev.map((i) => i.id === item.id ? { ...i, status: "analyzing" } : i));
+    try {
+      const form = new FormData();
+      form.append("image", item.photoFile, item.photoFile.name);
+      const res = await fetch("/api/analyze-photo", { method: "POST", body: form });
+      if (!res.ok) throw new Error("Analysis failed");
+      const data = await res.json();
+      const extracted = data.items?.[0];
+      if (!extracted) throw new Error("No items detected");
+
+      setItemsFn((prev) => prev.map((i) =>
+        i.id === item.id ? {
+          ...i,
+          name: extracted.name ?? "",
+          brand: extracted.brand ?? "",
+          description: extracted.description ?? "",
+          categories: extracted.categories ?? [],
+          visibleText: extracted.visibleText ?? "",
+          modelOrSku: extracted.modelOrSku ?? "",
+          tags: extracted.tags ?? [],
+          status: "ready",
+        } : i
+      ));
+    } catch {
+      setItemsFn((prev) => prev.map((i) =>
+        i.id === item.id ? { ...i, status: "error", error: "Could not analyze photo" } : i
+      ));
+    }
+  }, []);
+
   const handleFiles = useCallback(async (files: File[]) => {
-    const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+    const imageFiles = files.filter((f) => f.type.startsWith("image/")).slice(0, MAX_PHOTOS);
     if (imageFiles.length === 0) { toast.error("No image files found"); return; }
+    if (files.length > MAX_PHOTOS) {
+      toast(`Loaded first ${MAX_PHOTOS} photos (limit per batch)`, { duration: 4000 });
+    }
+    if (imageFiles.length > 50) {
+      toast(`Processing ${imageFiles.length} photos — items will appear as they're ready`, { duration: 5000, icon: "⚡" });
+    }
 
     const newItems: ExtractedItem[] = imageFiles.map((file) => ({
       id: uuidv4(),
@@ -123,44 +191,18 @@ function PhotoImportTab({
       macroLocation: "",
       photoFile: file,
       photoPreviewUrl: URL.createObjectURL(file),
-      status: "pending",
+      status: "pending" as const,
       selected: true,
     }));
 
     setItems((prev) => [...prev, ...newItems]);
 
-    // Analyze each photo sequentially
-    for (const item of newItems) {
-      setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, status: "analyzing" } : i));
-      try {
-        const form = new FormData();
-        form.append("image", item.photoFile, item.photoFile.name);
-        const res = await fetch("/api/analyze-photo", { method: "POST", body: form });
-        if (!res.ok) throw new Error("Analysis failed");
-        const data = await res.json();
-        const extracted = data.items?.[0];
-        if (!extracted) throw new Error("No items detected");
-
-        setItems((prev) => prev.map((i) =>
-          i.id === item.id ? {
-            ...i,
-            name: extracted.name ?? "",
-            brand: extracted.brand ?? "",
-            description: extracted.description ?? "",
-            categories: extracted.categories ?? [],
-            visibleText: extracted.visibleText ?? "",
-            modelOrSku: extracted.modelOrSku ?? "",
-            tags: extracted.tags ?? [],
-            status: "ready",
-          } : i
-        ));
-      } catch {
-        setItems((prev) => prev.map((i) =>
-          i.id === item.id ? { ...i, status: "error", error: "Could not analyze photo" } : i
-        ));
-      }
+    // Process in parallel batches
+    for (let i = 0; i < newItems.length; i += ANALYSIS_CONCURRENCY) {
+      const batch = newItems.slice(i, i + ANALYSIS_CONCURRENCY);
+      await Promise.all(batch.map((item) => analyzeItem(item, setItems)));
     }
-  }, [setItems]);
+  }, [setItems, analyzeItem]);
 
   function applyCommonData() {
     const loc = commonLocation.trim();
@@ -174,7 +216,8 @@ function PhotoImportTab({
   }
 
   const selectedCount = items.filter((i) => i.selected && i.status === "ready").length;
-  const pendingCount = items.filter((i) => i.status === "analyzing" || i.status === "pending").length;
+  const analyzingCount = items.filter((i) => i.status === "analyzing" || i.status === "pending").length;
+  const savedCount = items.filter((i) => i.status === "saved").length;
 
   return (
     <div className="space-y-5">
@@ -194,7 +237,7 @@ function PhotoImportTab({
         <ImageIcon className="w-8 h-8" style={{ color: "var(--ink-light)" }} />
         <div className="text-center">
           <p className="text-sm font-medium" style={{ color: "var(--ink-mid)" }}>Drop photos here or click to browse</p>
-          <p className="text-xs mt-1" style={{ color: "var(--ink-light)" }}>Supports JPG, PNG, WEBP — up to 50 photos</p>
+          <p className="text-xs mt-1" style={{ color: "var(--ink-light)" }}>JPG, PNG, WEBP — up to {MAX_PHOTOS} photos per batch</p>
         </div>
         <input
           id={fileInputId}
@@ -238,7 +281,7 @@ function PhotoImportTab({
               className="text-xs px-3 py-1.5 font-medium transition-opacity hover:opacity-75"
               style={{ background: "var(--parchment-dark)", border: "1px solid var(--border)", color: "var(--ink-mid)", borderRadius: "6px" }}
             >
-              Apply
+              Apply to all
             </button>
           </div>
 
@@ -247,7 +290,8 @@ function PhotoImportTab({
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--ink-light)" }}>
                 {items.length} photo{items.length !== 1 ? "s" : ""}
-                {pendingCount > 0 && ` · analyzing ${pendingCount}…`}
+                {analyzingCount > 0 && <span style={{ color: "var(--gold)" }}> · analyzing {analyzingCount}…</span>}
+                {savedCount > 0 && <span className="text-emerald-600"> · {savedCount} saved</span>}
               </p>
               <div className="flex items-center gap-3">
                 <button
@@ -275,7 +319,6 @@ function PhotoImportTab({
               >
                 {/* Row header */}
                 <div className="flex items-center gap-3 p-3">
-                  {/* Checkbox */}
                   <button
                     onClick={() => setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, selected: !i.selected } : i))}
                     disabled={item.status !== "ready"}
@@ -288,11 +331,9 @@ function PhotoImportTab({
                     {item.selected && item.status === "ready" && <Check className="w-2.5 h-2.5 text-white" />}
                   </button>
 
-                  {/* Thumbnail */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={item.photoPreviewUrl} alt="" className="shrink-0 object-cover rounded-lg" style={{ width: 48, height: 48 }} />
 
-                  {/* Status / info */}
                   <div className="flex-1 min-w-0">
                     {item.status === "analyzing" && (
                       <div className="flex items-center gap-2">
@@ -301,7 +342,7 @@ function PhotoImportTab({
                       </div>
                     )}
                     {item.status === "pending" && (
-                      <p className="text-xs" style={{ color: "var(--ink-light)" }}>Waiting…</p>
+                      <p className="text-xs" style={{ color: "var(--ink-light)" }}>Queued…</p>
                     )}
                     {item.status === "error" && (
                       <div className="flex items-center gap-1.5">
@@ -320,7 +361,6 @@ function PhotoImportTab({
                     )}
                   </div>
 
-                  {/* Expand/collapse edit */}
                   {item.status === "ready" && (
                     <button
                       onClick={() => setExpanded(expanded === item.id ? null : item.id)}
@@ -343,12 +383,12 @@ function PhotoImportTab({
                 {expanded === item.id && item.status === "ready" && (
                   <div className="px-3 pb-3 pt-0 space-y-2 border-t" style={{ borderColor: "var(--border)" }}>
                     <div className="pt-2 grid grid-cols-2 gap-2">
-                      {[
+                      {([
                         { label: "Name", field: "name" as const },
                         { label: "Brand", field: "brand" as const },
                         { label: "Micro location", field: "microLocation" as const },
                         { label: "Macro location", field: "macroLocation" as const },
-                      ].map(({ label, field }) => (
+                      ]).map(({ label, field }) => (
                         <div key={field}>
                           <label className="text-[10px] mb-0.5 block uppercase tracking-wider" style={{ color: "var(--ink-light)" }}>{label}</label>
                           <input
@@ -389,22 +429,27 @@ function PhotoImportTab({
             ))}
           </div>
 
-          {/* Save button */}
+          {/* Save button — available as soon as any items are ready */}
           {selectedCount > 0 && (
             <button
               onClick={onSaveAll}
-              disabled={saving || pendingCount > 0}
+              disabled={saving}
               className="w-full py-3 font-semibold text-sm transition-opacity hover:opacity-80 disabled:opacity-50"
               style={{ background: "var(--gold)", color: "var(--parchment-light)", borderRadius: "10px" }}
             >
               {saving ? (
                 <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Saving…</span>
-              ) : pendingCount > 0 ? (
-                `Wait — ${pendingCount} still analyzing…`
+              ) : analyzingCount > 0 ? (
+                `Save ${selectedCount} ready item${selectedCount !== 1 ? "s" : ""} · ${analyzingCount} still analyzing`
               ) : (
-                `Create ${selectedCount} item${selectedCount !== 1 ? "s" : ""}`
+                `Save ${selectedCount} item${selectedCount !== 1 ? "s" : ""}${batchName ? ` to "${batchName}"` : ""}`
               )}
             </button>
+          )}
+          {selectedCount === 0 && analyzingCount > 0 && (
+            <p className="text-xs text-center" style={{ color: "var(--ink-light)" }}>
+              Analyzing {analyzingCount} photo{analyzingCount !== 1 ? "s" : ""}… items will appear when ready
+            </p>
           )}
         </>
       )}
@@ -412,7 +457,7 @@ function PhotoImportTab({
   );
 }
 
-// ── CSV Import Tab ────────────────────────────────────────────────────────
+// ── CSV Import Tab ─────────────────────────────────────────────────────────────
 
 interface CsvRow {
   id: string;
@@ -435,8 +480,6 @@ function CsvImportTab({ onSaveCsv, saving }: { onSaveCsv: (rows: CsvRow[], mappi
       if (h.length === 0) { toast.error("Could not parse CSV"); return; }
       setHeaders(h);
       setRows(r.map((raw) => ({ id: uuidv4(), raw, selected: true })));
-
-      // Auto-map columns
       const autoMap: Record<string, string> = {};
       h.forEach((header) => {
         const field = autoMapColumn(header);
@@ -468,7 +511,7 @@ function CsvImportTab({ onSaveCsv, saving }: { onSaveCsv: (rows: CsvRow[], mappi
     <div className="space-y-5">
       {step === "upload" && (
         <div
-          className="flex flex-col items-center justify-center gap-3 py-10 rounded-xl border-2 border-dashed cursor-pointer transition-colors hover:border-amber-400 hover:bg-amber-50/20"
+          className="flex flex-col items-center justify-center gap-3 py-10 rounded-xl border-2 border-dashed cursor-pointer transition-colors"
           style={{ borderColor: "var(--border)", background: "var(--parchment)" }}
           onClick={() => document.getElementById(fileInputId)?.click()}
         >
@@ -487,7 +530,7 @@ function CsvImportTab({ onSaveCsv, saving }: { onSaveCsv: (rows: CsvRow[], mappi
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>Map columns</p>
-              <p className="text-xs mt-0.5" style={{ color: "var(--ink-light)" }}>{rows.length} rows found — assign each column to a field</p>
+              <p className="text-xs mt-0.5" style={{ color: "var(--ink-light)" }}>{rows.length} rows — assign each column to a field</p>
             </div>
             <button onClick={() => setStep("upload")} className="text-xs transition-opacity hover:opacity-70" style={{ color: "var(--ink-light)" }}>
               Upload different file
@@ -537,7 +580,7 @@ function CsvImportTab({ onSaveCsv, saving }: { onSaveCsv: (rows: CsvRow[], mappi
               <p className="text-xs mt-0.5" style={{ color: "var(--ink-light)" }}>Showing first 5 of {rows.length} rows</p>
             </div>
             <button onClick={() => setStep("map")} className="text-xs transition-opacity hover:opacity-70" style={{ color: "var(--ink-light)" }}>
-              ← Back to mapping
+              ← Back
             </button>
           </div>
 
@@ -554,17 +597,6 @@ function CsvImportTab({ onSaveCsv, saving }: { onSaveCsv: (rows: CsvRow[], mappi
                 </div>
               );
             })}
-          </div>
-
-          <div className="flex items-center justify-between py-2 px-3 rounded-lg" style={{ background: "var(--parchment-light)", border: "1px solid var(--border)" }}>
-            <p className="text-xs" style={{ color: "var(--ink-mid)" }}>Import {rows.length} items</p>
-            <button
-              onClick={() => setRows((prev) => prev.map((r) => ({ ...r, selected: true })))}
-              className="text-xs transition-opacity hover:opacity-70"
-              style={{ color: "var(--ink-light)" }}
-            >
-              Select all
-            </button>
           </div>
 
           <button
@@ -585,16 +617,98 @@ function CsvImportTab({ onSaveCsv, saving }: { onSaveCsv: (rows: CsvRow[], mappi
   );
 }
 
-// ── Page ─────────────────────────────────────────────────────────────────��
+// ── Export Tab ────────────────────────────────────────────────────────────────
+
+function ExportTab({ inventoryId, inventoryName }: { inventoryId: string; inventoryName: string }) {
+  const [loading, setLoading] = useState(false);
+
+  async function handleExport() {
+    setLoading(true);
+    try {
+      const items = await getInventoryItems(inventoryId);
+      if (items.length === 0) { toast.error("No items to export"); return; }
+
+      const headers = [
+        "name", "description", "story", "provenance", "brand",
+        "microLocation", "macroLocation", "originPlace",
+        "categories", "tags", "condition", "passTo", "isLoanable",
+        "addedBy", "addedAt",
+      ];
+
+      const rows = items.map((item) => [
+        item.name,
+        item.description,
+        item.story,
+        item.provenance,
+        item.labData?.brand ?? "",
+        item.microLocation,
+        item.macroLocation,
+        item.originPlace?.name ?? "",
+        item.categories.join(";"),
+        (item.tags ?? []).join(";"),
+        item.condition,
+        item.passTo,
+        item.isLoanable ? "yes" : "no",
+        item.addedByName || item.addedByEmail,
+        item.addedAt instanceof Date ? item.addedAt.toISOString().slice(0, 10) : "",
+      ]);
+
+      const csv = buildCsvString(headers, rows);
+      const filename = `${inventoryName.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_export_${new Date().toISOString().slice(0, 10)}.csv`;
+      downloadCsv(filename, csv);
+      toast.success(`Exported ${items.length} items`);
+    } catch {
+      toast.error("Export failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="p-5 rounded-xl space-y-4" style={{ border: "1px solid var(--border)", background: "var(--parchment-light)" }}>
+        <div>
+          <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>Export to CSV</p>
+          <p className="text-xs mt-1" style={{ color: "var(--ink-mid)" }}>
+            Download all items in <strong>{inventoryName}</strong> as a spreadsheet. Useful for insurance, sharing with family, or backup.
+          </p>
+        </div>
+        <p className="text-xs" style={{ color: "var(--ink-light)" }}>
+          Includes: name, description, story, locations, categories, tags, condition, who it passes to, and more.
+        </p>
+        <button
+          onClick={handleExport}
+          disabled={loading}
+          className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold transition-opacity hover:opacity-80 disabled:opacity-50"
+          style={{ background: "var(--gold)", color: "var(--parchment-light)", borderRadius: "8px" }}
+        >
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          {loading ? "Preparing export…" : "Download CSV"}
+        </button>
+      </div>
+
+      <div className="p-4 rounded-xl" style={{ border: "1px dashed var(--border)", background: "var(--parchment)" }}>
+        <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--ink-light)" }}>Tip</p>
+        <p className="text-xs" style={{ color: "var(--ink-mid)" }}>
+          You can re-import this CSV file into another inventory using the CSV Import tab above.
+          The column mapping will auto-detect the standard fields.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function BulkImportPage() {
   const { user, loading: authLoading } = useAuthContext();
   const { currentInventory } = useInventoryContext();
   const router = useRouter();
 
-  const [tab, setTab] = useState<"photos" | "csv">("photos");
+  const [tab, setTab] = useState<"photos" | "csv" | "export">("photos");
   const [photoItems, setPhotoItems] = useState<ExtractedItem[]>([]);
   const [saving, setSaving] = useState(false);
+  const [batchName, setBatchName] = useState("");
 
   if (!authLoading && !user) return <LoginForm />;
 
@@ -608,6 +722,7 @@ export default function BulkImportPage() {
     let saved = 0;
     let failed = 0;
 
+    // Save with progress — items appear in inventory as they save
     for (const item of toSave) {
       try {
         const photoUrls = await uploadPhotos([item.photoFile], user.uid);
@@ -645,7 +760,7 @@ export default function BulkImportPage() {
     }
 
     setSaving(false);
-    if (saved > 0) toast.success(`${saved} item${saved !== 1 ? "s" : ""} added to your inventory`);
+    if (saved > 0) toast.success(`${saved} item${saved !== 1 ? "s" : ""} added${batchName ? ` to "${batchName}"` : ""}`);
     if (failed > 0) toast.error(`${failed} item${failed !== 1 ? "s" : ""} failed to save`);
     if (failed === 0 && saved > 0) {
       setTimeout(() => router.push("/"), 1200);
@@ -705,12 +820,18 @@ export default function BulkImportPage() {
     }
 
     setSaving(false);
-    if (saved > 0) toast.success(`${saved} item${saved !== 1 ? "s" : ""} imported`);
+    if (saved > 0) toast.success(`${saved} item${saved !== 1 ? "s" : ""} imported${batchName ? ` to "${batchName}"` : ""}`);
     if (failed > 0) toast.error(`${failed} row${failed !== 1 ? "s" : ""} failed`);
     if (failed === 0 && saved > 0) {
       setTimeout(() => router.push("/"), 1200);
     }
   }
+
+  const TABS = [
+    { id: "photos" as const, Icon: ImageIcon, label: "Photos", desc: "AI reads each photo" },
+    { id: "csv" as const, Icon: FileText, label: "CSV", desc: "From a spreadsheet" },
+    { id: "export" as const, Icon: Download, label: "Export", desc: "Download as CSV" },
+  ];
 
   return (
     <div className="min-h-screen" style={{ background: "var(--parchment)" }}>
@@ -726,15 +847,32 @@ export default function BulkImportPage() {
           >
             ← Back
           </button>
-          <h1 className="font-serif text-xl font-bold" style={{ color: "var(--ink)" }}>Bulk Import</h1>
-          <p className="text-sm mt-1" style={{ color: "var(--ink-mid)" }}>
-            Import multiple items at once — from photos or a spreadsheet
-          </p>
-          {currentInventory && (
-            <p className="text-xs mt-1" style={{ color: "var(--ink-light)" }}>
-              Adding to: <span className="font-medium" style={{ color: "var(--ink-mid)" }}>{currentInventory.name}</span>
-            </p>
-          )}
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="font-serif text-xl font-bold" style={{ color: "var(--ink)" }}>Import & Export</h1>
+              <p className="text-sm mt-1" style={{ color: "var(--ink-mid)" }}>
+                Import multiple items at once, or export your inventory to CSV
+              </p>
+              {currentInventory && (
+                <p className="text-xs mt-1" style={{ color: "var(--ink-light)" }}>
+                  Inventory: <span className="font-medium" style={{ color: "var(--ink-mid)" }}>{currentInventory.name}</span>
+                </p>
+              )}
+            </div>
+            {/* Batch name field — shown for photo/csv tabs */}
+            {tab !== "export" && (
+              <div className="shrink-0">
+                <label className="text-[10px] uppercase tracking-wider block mb-1" style={{ color: "var(--ink-light)" }}>Batch name</label>
+                <input
+                  value={batchName}
+                  onChange={(e) => setBatchName(e.target.value)}
+                  placeholder="e.g. Mom's estate"
+                  className="text-xs px-2.5 py-1.5 w-36 focus:outline-none"
+                  style={{ background: "var(--parchment-light)", border: "1px solid var(--border)", color: "var(--ink)", borderRadius: "6px" }}
+                />
+              </div>
+            )}
+          </div>
         </div>
 
         {!currentInventory && (
@@ -747,22 +885,20 @@ export default function BulkImportPage() {
           <>
             {/* Tabs */}
             <div className="flex border-b mb-6" style={{ borderColor: "var(--border)" }}>
-              {([
-                { id: "photos" as const, label: "📷 Photo Import", desc: "AI reads each photo" },
-                { id: "csv" as const, label: "📄 CSV Import", desc: "From a spreadsheet" },
-              ]).map(({ id, label, desc }) => (
+              {TABS.map(({ id, Icon, label, desc }) => (
                 <button
                   key={id}
                   onClick={() => setTab(id)}
-                  className="px-4 py-3 text-xs border-b-2 transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-3 text-xs border-b-2 transition-colors"
                   style={{
                     borderColor: tab === id ? "var(--gold)" : "transparent",
                     color: tab === id ? "var(--gold)" : "var(--ink-light)",
                     fontWeight: tab === id ? 600 : 400,
                   }}
                 >
+                  <Icon className="w-3.5 h-3.5" />
                   {label}
-                  <span className="ml-1.5 hidden sm:inline" style={{ color: tab === id ? "var(--gold)" : "var(--ink-light)", opacity: 0.7 }}>{desc}</span>
+                  <span className="ml-0.5 hidden sm:inline opacity-60">{desc}</span>
                 </button>
               ))}
             </div>
@@ -773,11 +909,14 @@ export default function BulkImportPage() {
                 setItems={setPhotoItems}
                 onSaveAll={handleSavePhotos}
                 saving={saving}
+                batchName={batchName}
               />
             )}
-
             {tab === "csv" && (
               <CsvImportTab onSaveCsv={handleSaveCsv} saving={saving} />
+            )}
+            {tab === "export" && (
+              <ExportTab inventoryId={currentInventory.id} inventoryName={currentInventory.name} />
             )}
           </>
         )}
