@@ -168,8 +168,6 @@ export function AddItemFlow() {
 
   async function processStoryRecording() {
     const text = transcript.trim();
-    if (!text) { toast.error("Please add a description first."); return; }
-
     setStep("processing");
     try {
       const res = await fetch("/api/process-recording", {
@@ -212,8 +210,6 @@ export function AddItemFlow() {
 
   async function processLabRecording() {
     const text = transcript.trim();
-    if (!text) { toast.error("Please add a description first."); return; }
-
     setStep("processing");
     try {
       const res = await fetch("/api/process-lab-recording", {
@@ -255,6 +251,14 @@ export function AddItemFlow() {
   }
 
   function processRecording() {
+    const text = transcript.trim();
+    if (!text) {
+      // No transcript — skip AI processing, go straight to manual review form
+      setExtracted(emptyExtracted());
+      setEditing(true);
+      setStep("review");
+      return;
+    }
     return docType === "lab" ? processLabRecording() : processStoryRecording();
   }
 
@@ -686,15 +690,16 @@ export function AddItemFlow() {
 
       {/* Submit */}
       <div className="space-y-2">
-        <button onClick={processRecording} disabled={!hasTranscript}
-          className="w-full py-4 bg-amber-500 hover:bg-amber-600 disabled:bg-stone-200 disabled:text-stone-400 text-white font-semibold rounded-xl transition-colors text-base">
-          Continue →
+        <button onClick={processRecording}
+          className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-colors text-base">
+          {hasTranscript ? "Continue →" : photos.length > 0 ? "Save photo item →" : "Enter details manually →"}
         </button>
-        {!recordingStopped && (
-          <p className="text-center text-xs text-stone-400">Record yourself describing the object to continue</p>
-        )}
-        {recordingStopped && !hasTranscript && (
-          <p className="text-center text-xs text-stone-400">Type a description above to continue</p>
+        {!hasTranscript && (
+          <p className="text-center text-xs text-stone-400">
+            {photos.length > 0
+              ? "Use Quick Add above to auto-fill from the photo, or continue to enter details manually"
+              : "Voice and photo are both optional — continue to fill in details manually"}
+          </p>
         )}
       </div>
     </div>
