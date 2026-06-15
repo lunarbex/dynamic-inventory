@@ -20,7 +20,7 @@ export function Footer() {
   </a>
   <Link
     href="/privacy"
-    ...        </nav>
+    </nav>
       </div>
     </footer>
   );
