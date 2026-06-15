@@ -11,21 +11,16 @@ export function Footer() {
           © {new Date().getFullYear()} InvenStories · Public Beta
         </p>
         <nav className="flex items-center gap-5">
-          <Link
-            href="/privacy"
-            className="text-xs transition-opacity hover:opacity-75"
-            style={{ color: "var(--ink-light)" }}
-          >
-            Privacy
-          </Link>
-          <Link
-            href="/terms"
-            className="text-xs transition-opacity hover:opacity-75"
-            style={{ color: "var(--ink-light)" }}
-          >
-            Terms
-          </Link>
-        </nav>
+  <a
+    href="mailto:hello@invenstories.app"
+    className="text-xs transition-opacity hover:opacity-75"
+    style={{ color: "var(--ink-light)" }}
+  >
+    Contact
+  </a>
+  <Link
+    href="/privacy"
+    ...        </nav>
       </div>
     </footer>
   );
