@@ -10,26 +10,30 @@ export function Footer() {
         <p className="text-xs" style={{ color: "var(--ink-light)" }}>
           © {new Date().getFullYear()} InvenStories · Public Beta
         </p>
-<nav className="flex items-center gap-5">
-  <a
-    href="mailto:hello@invenstories.app"
-    className="text-xs transition-opacity hover:opacity-75"
-    style={{ color: "var(--ink-light)" }}
-  >
-    Contact
-  </a>
-  <Link
-    href="/privacy"
-    className="text-xs transition-opacity hover:opacity-75"
-    style={{ color: "var(--ink-light)" }}
-  >
-    Privacy
-  </Link>
-  <Link
-    href="/terms"
-    className="text-xs transition-opacity hover:opacity-75"
-    style={{ color: "var(--ink-light)" }}
-  >
-    Terms
-  </Link>
-</nav>
+        <nav className="flex items-center gap-5">
+          <a
+            href="mailto:hello@invenstories.app"
+            className="text-xs transition-opacity hover:opacity-75"
+            style={{ color: "var(--ink-light)" }}
+          >
+            Contact
+          </a>
+          <Link
+            href="/privacy"
+            className="text-xs transition-opacity hover:opacity-75"
+            style={{ color: "var(--ink-light)" }}
+          >
+            Privacy
+          </Link>
+          <Link
+            href="/terms"
+            className="text-xs transition-opacity hover:opacity-75"
+            style={{ color: "var(--ink-light)" }}
+          >
+            Terms
+          </Link>
+        </nav>
+      </div>
+    </footer>
+  );
+}
