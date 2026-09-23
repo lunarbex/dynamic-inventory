@@ -45,8 +45,14 @@ function buildFirestoreSettings() {
   const hasIndexedDB =
     typeof window !== "undefined" && typeof indexedDB !== "undefined";
 
+  // Item writes conditionally include optional fields (e.g. labData) as
+  // `undefined` for the inapplicable doc type. The Firestore SDK throws on
+  // undefined field values by default — ignore them instead of erroring.
+  const base = { ignoreUndefinedProperties: true };
+
   if (hasIndexedDB) {
     return {
+      ...base,
       localCache: persistentLocalCache({
         tabManager: persistentSingleTabManager({}),
       }),
@@ -54,7 +60,7 @@ function buildFirestoreSettings() {
   }
 
   console.warn("[Firebase] IndexedDB unavailable — using in-memory cache");
-  return { localCache: memoryLocalCache() };
+  return { ...base, localCache: memoryLocalCache() };
 }
 
 export const db = isNew
