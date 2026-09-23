@@ -123,6 +123,10 @@ export interface InventoryItem {
   documentationType?: "story" | "lab";
   processedBy?: string;
   labData?: ItemLabData;
+
+  // Grab list / insurance
+  isPriority: boolean;           // flagged as a priority item to grab
+  estimatedValue: number | null; // in USD, for insurance purposes
 }
 
 export interface UserStats {

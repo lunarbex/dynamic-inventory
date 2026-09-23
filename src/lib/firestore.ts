@@ -61,6 +61,8 @@ export function itemFromFirestore(id: string, data: Record<string, unknown>): In
     documentationType: (data.documentationType as "story" | "lab" | undefined) ?? undefined,
     processedBy: (data.processedBy as string | undefined) ?? undefined,
     labData: (data.labData as ItemLabData | undefined) ?? undefined,
+    isPriority: (data.isPriority as boolean) ?? false,
+    estimatedValue: (data.estimatedValue as number | null | undefined) ?? null,
   };
 }
 

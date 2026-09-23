@@ -750,6 +750,8 @@ export default function BulkImportPage() {
           isCollection: false,
           importSource: "bulk-photo",
           importBatchId: batchId,
+          isPriority: false,
+          estimatedValue: null,
         });
         setPhotoItems((prev) => prev.map((i) => i.id === item.id ? { ...i, status: "saved" } : i));
         saved++;
@@ -812,6 +814,8 @@ export default function BulkImportPage() {
           isCollection: false,
           importSource: "csv",
           importBatchId: batchId,
+          isPriority: false,
+          estimatedValue: null,
         });
         saved++;
       } catch {

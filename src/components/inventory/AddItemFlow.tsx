@@ -34,6 +34,8 @@ interface ExtractedState {
   condition: string;
   tags: string[];
   labData?: ItemLabData;
+  isPriority: boolean;
+  estimatedValue: number | null;
 }
 
 function emptyExtracted(): ExtractedState {
@@ -51,6 +53,8 @@ function emptyExtracted(): ExtractedState {
     isLoanable: false,
     condition: "",
     tags: [],
+    isPriority: false,
+    estimatedValue: null,
   };
 }
 
@@ -131,6 +135,8 @@ export function AddItemFlow() {
         isLoanable: false,
         condition: "",
         tags: item.tags ?? [],
+        isPriority: false,
+        estimatedValue: null,
       });
       setStep("review");
     } catch (err) {
@@ -197,6 +203,8 @@ export function AddItemFlow() {
         isLoanable: data.extracted.isLoanable,
         condition: data.extracted.condition,
         tags: data.extracted.tags ?? [],
+        isPriority: false,
+        estimatedValue: null,
       });
       setStep("review");
     } catch (err) {
@@ -241,6 +249,8 @@ export function AddItemFlow() {
         condition: "",
         tags: e.tags ?? [],
         labData: e.labData,
+        isPriority: false,
+        estimatedValue: null,
       });
       setStep("review");
     } catch (err) {
@@ -302,7 +312,7 @@ export function AddItemFlow() {
         macroLocation: extracted.macroLocation,
         originPlace: extracted.originPlace,
         photos: photoUrls,
-        audioUrl,
+        ...(audioUrl ? { audioUrl } : {}),
         voiceTranscript: extracted.transcript,
         passTo: extracted.passTo,
         isLoanable: extracted.isLoanable,
@@ -318,6 +328,8 @@ export function AddItemFlow() {
         documentationType: docType,
         processedBy: docType === "lab" ? "lab_assistant" : "story_listener",
         labData: docType === "lab" ? extracted.labData : undefined,
+        isPriority: extracted.isPriority,
+        estimatedValue: extracted.estimatedValue,
       });
 
       console.log("[AddItemFlow] saved! id:", newId);
@@ -425,6 +437,38 @@ export function AddItemFlow() {
             <Field label="City / region (macro)" value={extracted.macroLocation} editing={editing}
               placeholder="e.g. San Francisco, CA"
               onChange={(v) => setExtracted((p) => p && ({ ...p, macroLocation: v }))} />
+          </div>
+
+          {/* Priority / grab list */}
+          <div className="space-y-2 pt-1 border-t border-amber-200">
+            {editing ? (
+              <button type="button"
+                onClick={() => setExtracted((p) => p && ({ ...p, isPriority: !p.isPriority }))}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  extracted.isPriority ? "bg-amber-100 text-amber-800" : "bg-stone-100 text-stone-500"
+                }`}>
+                ⭐ {extracted.isPriority ? "Priority item — on the grab list" : "Priority item — add to grab list"}
+              </button>
+            ) : extracted.isPriority ? (
+              <p className="text-sm text-amber-800">⭐ Priority item — on the grab list</p>
+            ) : null}
+            {editing && (
+              <div>
+                <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-1">
+                  Estimated value (optional — useful for insurance)
+                </p>
+                <input type="number" min="0" step="0.01" inputMode="decimal"
+                  value={extracted.estimatedValue ?? ""}
+                  onChange={(e) => setExtracted((p) => p && ({
+                    ...p, estimatedValue: e.target.value === "" ? null : parseFloat(e.target.value),
+                  }))}
+                  placeholder="$0.00"
+                  className="w-full text-sm text-stone-800 bg-white border border-amber-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400 placeholder-stone-300" />
+              </div>
+            )}
+            {!editing && extracted.estimatedValue != null && (
+              <p className="text-sm text-stone-600">Est. value: ${extracted.estimatedValue.toLocaleString()}</p>
+            )}
           </div>
 
           {docType === "lab" ? (

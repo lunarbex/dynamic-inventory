@@ -35,6 +35,8 @@ interface EditState {
   tags: string[];
   documentationType: "story" | "lab";
   labData: ItemLabData;
+  isPriority: boolean;
+  estimatedValue: number | null;
 }
 
 async function geocodeClient(name: string): Promise<{ lat: number; lng: number } | null> {
@@ -67,6 +69,8 @@ export function EditItemForm({ item, userId, userEmail, onSave, onCancel }: Edit
     tags: [...(item.tags ?? [])],
     documentationType: item.documentationType ?? "story",
     labData: item.labData ?? { specifications: {}, testConditions: {}, observations: "", results: {}, nextSteps: [] },
+    isPriority: item.isPriority ?? false,
+    estimatedValue: item.estimatedValue ?? null,
   });
 
   // Photos: existing URLs to keep, existing URLs to remove, new File[] to add
@@ -145,6 +149,8 @@ export function EditItemForm({ item, userId, userEmail, onSave, onCancel }: Edit
         photos: finalPhotos,
         documentationType: fields.documentationType,
         labData: fields.documentationType === "lab" ? fields.labData : undefined,
+        isPriority: fields.isPriority,
+        estimatedValue: fields.estimatedValue,
       };
 
       await updateItem(item.id, updates, { uid: userId, email: userEmail });
@@ -257,6 +263,24 @@ export function EditItemForm({ item, userId, userEmail, onSave, onCancel }: Edit
             📍 Currently mapped at {item.originPlace.lat.toFixed(3)}, {item.originPlace.lng?.toFixed(3)}
           </p>
         )}
+      </Section>
+
+      {/* Priority / grab list */}
+      <Section title="Priority">
+        <button type="button" onClick={() => set("isPriority", !fields.isPriority)}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+            fields.isPriority
+              ? "bg-amber-100 text-amber-800 border border-amber-200"
+              : "bg-stone-100 text-stone-500 border border-stone-200"
+          }`}>
+          ⭐ {fields.isPriority ? "Priority item — on the grab list" : "Priority item — add to grab list"}
+        </button>
+
+        <Label text="Estimated value (optional — useful for insurance)" />
+        <input type="number" min="0" step="0.01" inputMode="decimal"
+          value={fields.estimatedValue ?? ""}
+          onChange={(e) => set("estimatedValue", e.target.value === "" ? null : parseFloat(e.target.value))}
+          className={inputCls} placeholder="$0.00" />
       </Section>
 
       {/* Story & provenance — story mode only */}

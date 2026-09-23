@@ -17,7 +17,7 @@ import { TagInput } from "@/components/inventory/TagInput";
 import { EditItemForm } from "@/components/inventory/EditItemForm";
 import {
   ArrowLeft, ChevronLeft, ChevronRight, Archive,
-  Navigation, Heart, Pencil, Trash2, Share2, Play, Pause, FlaskConical, BookOpen,
+  Navigation, Heart, Pencil, Trash2, Share2, Play, Pause, FlaskConical, BookOpen, Star,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -288,8 +288,13 @@ export default function ItemDetailPage() {
         {/* ── Title ────────────────────────────────────────────── */}
         <div className="flex items-start justify-between gap-4 mb-2">
           <div>
-            <h1 className="font-serif text-3xl font-bold leading-tight" style={{ color: "var(--ink)" }}>
+            <h1 className="font-serif text-3xl font-bold leading-tight flex items-center gap-2" style={{ color: "var(--ink)" }}>
               {item.name}
+              {item.isPriority && (
+                <span title="Priority item — on the grab list">
+                  <Star className="w-5 h-5 shrink-0" style={{ color: "var(--gold)" }} fill="var(--gold)" />
+                </span>
+              )}
             </h1>
             {item.description && (
               <p className="font-serif italic mt-2 text-base leading-relaxed" style={{ color: "var(--ink-mid)" }}>
@@ -599,6 +604,12 @@ export default function ItemDetailPage() {
               <div className="flex gap-3">
                 <span className="w-20 shrink-0" style={{ color: "var(--ink-light)" }}>Condition</span>
                 <span>{item.condition}</span>
+              </div>
+            )}
+            {item.estimatedValue != null && (
+              <div className="flex gap-3">
+                <span className="w-20 shrink-0" style={{ color: "var(--ink-light)" }}>Est. value</span>
+                <span>${item.estimatedValue.toLocaleString()}</span>
               </div>
             )}
             {item.passTo && (
